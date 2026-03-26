@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page</title>
+</head>
+<body>
+    <h1>If you see this, frontend server is working!</h1>
+    <script>
+        console.log('Test page loaded successfully');
+        
+        // Test API connection
+        fetch('http://localhost:6000/health')
+            .then(res => res.json())
+            .then(data => {
+                console.log('Backend response:', data);
+                document.body.innerHTML += '<p style="color: green;">Backend is connected! ✓</p>';
+            })
+            .catch(err => {
+                console.error('Backend error:', err);
+                document.body.innerHTML += '<p style="color: red;">Backend connection failed! ✗</p>';
+            });
+    </script>
+</body>
+</html>

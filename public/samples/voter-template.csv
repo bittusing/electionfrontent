@@ -1,0 +1,5 @@
+name,phone,email,gender,age,street,landmark,pincode,occupation,voterIdNumber,caste,religion,education,supportLevel,consentStatus
+Rajesh Kumar,9876543210,rajesh@example.com,MALE,35,123 Main Street,Near Park,110001,Business,ABC1234567,GENERAL,HINDU,GRADUATE,SUPPORTER,GIVEN
+Priya Sharma,9876543211,priya@example.com,FEMALE,28,456 Park Road,Near Temple,400001,Teacher,DEF2345678,OBC,HINDU,POST_GRADUATE,STRONG_SUPPORTER,GIVEN
+Mohammed Ali,9876543212,ali@example.com,MALE,42,789 Lake View,Near Mosque,560001,Engineer,GHI3456789,GENERAL,MUSLIM,GRADUATE,NEUTRAL,NOT_GIVEN
+Sunita Devi,9876543213,sunita@example.com,FEMALE,31,321 Garden Street,Near School,700001,Homemaker,JKL4567890,SC,HINDU,SECONDARY,UNKNOWN,NOT_GIVEN
