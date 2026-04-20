@@ -15,7 +15,7 @@ const MENU_ITEMS = [
   { name: 'Rallies', icon: FiCalendar, path: '/rallies', permModule: 'rallies' },
   { name: 'Daily Reports', icon: FiFileText, path: '/reports', permModule: 'reports' },
   { name: 'Workers', icon: FiUserCheck, path: '/workers', permModule: 'workers' },
-  { name: 'Analytics', icon: FiBarChart2, path: '/analytics', permModule: 'reports', permAction: 'viewAll' },
+  { name: 'Analytics', icon: FiBarChart2, path: '/analytics', permModule: 'reports', permAction: 'view' },
   { name: 'Users', icon: FiUsers, path: '/users', permModule: 'users' },
   { name: 'Settings', icon: FiSettings, path: '/settings', alwaysShow: true },
 ]

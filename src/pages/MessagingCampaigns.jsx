@@ -85,9 +85,11 @@ export default function MessagingCampaigns() {
         <div className="card text-center py-12">
           <FiMessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-4" />
           <p className="text-gray-500">No messaging campaigns found</p>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary mt-4">
-            Create Your First Campaign
-          </button>
+          {hasPermission('campaigns', 'create') && (
+            <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary mt-4">
+              Create Your First Campaign
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

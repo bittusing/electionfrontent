@@ -13,7 +13,16 @@ import {
   Cell,
   CartesianGrid,
 } from 'recharts'
-import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap } from 'react-leaflet'
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  GeoJSON,
+  useMap,
+  Circle,
+  Tooltip as LeafletTooltip,
+} from 'react-leaflet'
 import L from 'leaflet'
 import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
@@ -30,6 +39,33 @@ const AREA_COLORS = {
   VILLAGE: '#16a34a',
   WARD: '#6366f1',
   BOOTH: '#dc2626',
+}
+
+/** ~26 km — visible “district” emphasis on state-level map without hiding the state outline. */
+const DISTRICT_HIGHLIGHT_RADIUS_M = 26000
+
+function normalisePlaceName(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\bdistrict\b/gi, '')
+    .trim()
+}
+
+/** Match Settings → District to a DISTRICT/TEHSIL area (uses saved coordinates when present). */
+function findDistrictAreaRecord(areas, districtName) {
+  if (!districtName?.trim() || !Array.isArray(areas)) return null
+  const d = normalisePlaceName(districtName)
+  if (!d) return null
+  const tier = areas.filter((a) => a?.type === 'DISTRICT' || a?.type === 'TEHSIL')
+  const exact = tier.find((a) => normalisePlaceName(a.name) === d)
+  if (exact) return exact
+  return (
+    tier.find((a) => {
+      const n = normalisePlaceName(a.name)
+      return n.includes(d) || d.includes(n)
+    }) || null
+  )
 }
 
 const STATE_CENTERS = {
@@ -69,16 +105,18 @@ const STATE_CENTERS = {
 }
 
 function createMarkerIcon(type) {
-  const color = AREA_COLORS[type] || '#6b7280'
-  const sizes = { STATE: 20, DISTRICT: 16, TEHSIL: 14, BLOCK: 13, WARD: 11, VILLAGE: 11, BOOTH: 10 }
-  const size = sizes[type] || 10
+  const color = AREA_COLORS[type] || '#64748b'
+  const sizes = { STATE: 18, DISTRICT: 14, TEHSIL: 12, BLOCK: 11, WARD: 10, VILLAGE: 10, BOOTH: 9 }
+  const size = sizes[type] || 9
 
   return L.divIcon({
     className: 'custom-marker',
     html: `<div style="
       width:${size * 2}px; height:${size * 2}px;
-      background:${color}; border:3px solid #fff;
-      border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.35);
+      background:${color};
+      border:2px solid #fff;
+      border-radius:50%;
+      box-shadow:0 1px 2px rgba(15,23,42,0.12), 0 2px 8px rgba(15,23,42,0.18);
     "></div>`,
     iconSize: [size * 2, size * 2],
     iconAnchor: [size, size],
@@ -482,6 +520,8 @@ function ConstituencyMap({ areas, electionConfig }) {
   const [stateGeoJson, setStateGeoJson] = useState(null)
   const [geoLoading, setGeoLoading] = useState(false)
   const geoRef = useRef(null)
+  /** { lat, lng, label, source: 'area' | 'geocode' } — from CRM area coords or OSM Nominatim. */
+  const [districtHighlight, setDistrictHighlight] = useState(null)
 
   useEffect(() => {
     const stateName = electionConfig?.state
@@ -512,6 +552,61 @@ function ConstituencyMap({ areas, electionConfig }) {
       .finally(() => setGeoLoading(false))
   }, [electionConfig?.state])
 
+  useEffect(() => {
+    const district = electionConfig?.district?.trim()
+    const state = electionConfig?.state?.trim()
+    if (!district || !state) {
+      setDistrictHighlight(null)
+      return
+    }
+
+    const areaRow = findDistrictAreaRecord(areas, district)
+    const lat = areaRow?.coordinates?.latitude
+    const lng = areaRow?.coordinates?.longitude
+    if (lat != null && lng != null && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))) {
+      setDistrictHighlight({
+        lat: Number(lat),
+        lng: Number(lng),
+        label: areaRow.name || district,
+        source: 'area',
+      })
+      return
+    }
+
+    let cancelled = false
+    const ac = new AbortController()
+    const t = setTimeout(() => {
+      const q = `${district}, ${state}, India`
+      fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=in`,
+        { signal: ac.signal, headers: { Accept: 'application/json' } }
+      )
+        .then((res) => res.json())
+        .then((json) => {
+          if (cancelled || !Array.isArray(json) || !json[0]) {
+            if (!cancelled) setDistrictHighlight(null)
+            return
+          }
+          const hit = json[0]
+          setDistrictHighlight({
+            lat: parseFloat(hit.lat),
+            lng: parseFloat(hit.lon),
+            label: district,
+            source: 'geocode',
+          })
+        })
+        .catch(() => {
+          if (!cancelled) setDistrictHighlight(null)
+        })
+    }, 500)
+
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+      ac.abort()
+    }
+  }, [electionConfig?.district, electionConfig?.state, areas])
+
   const mapCenter = useMemo(() => {
     if (electionConfig?.state && STATE_CENTERS[electionConfig.state]) {
       return STATE_CENTERS[electionConfig.state]
@@ -535,20 +630,27 @@ function ConstituencyMap({ areas, electionConfig }) {
     return buildMaskGeoJson(stateGeoJson)
   }, [stateGeoJson])
 
-  const maskStyle = { color: 'transparent', fillColor: '#ffffff', fillOpacity: 1, weight: 0 }
+  const maskStyle = { color: 'transparent', fillColor: '#f1f5f9', fillOpacity: 0.92, weight: 0 }
 
   const stateStyle = {
-    color: '#1e40af',
-    weight: 2.5,
-    fillColor: '#3b82f6',
-    fillOpacity: 0.08,
+    color: '#334155',
+    weight: 2,
+    fillColor: '#475569',
+    fillOpacity: 0.06,
     dashArray: '',
   }
 
   const stateHoverStyle = {
-    weight: 3,
-    fillOpacity: 0.18,
-    fillColor: '#2563eb',
+    weight: 2.5,
+    fillOpacity: 0.1,
+    fillColor: '#475569',
+  }
+
+  const districtCircleStyle = {
+    color: '#0f172a',
+    weight: 2,
+    fillColor: '#1e293b',
+    fillOpacity: 0.07,
   }
 
   const onEachFeature = (feature, layer) => {
@@ -564,49 +666,116 @@ function ConstituencyMap({ areas, electionConfig }) {
   }
 
   return (
-    <div className="card p-0 overflow-hidden">
-      <div className="p-5 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800">
-            {electionConfig?.state || 'Constituency'} Map
-          </h3>
-          <p className="text-gray-500 text-xs mt-0.5">
-            {stateGeoJson
-              ? `Showing ${electionConfig?.state} boundary`
-              : geoLoading ? 'Loading map boundary...' : 'Set state in Election Config to see boundary'}
-            {areasWithCoords.length > 0 && ` • ${areasWithCoords.length} area markers`}
-          </p>
+    <section className="card p-0 overflow-hidden border-slate-200/90 shadow-card">
+      <header className="border-b border-slate-100 bg-gradient-to-b from-slate-50/90 to-white px-6 py-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Geographic overview
+            </p>
+            <h3 className="mt-1.5 text-xl font-semibold tracking-tight text-slate-900">
+              {electionConfig?.state || 'Constituency territory'}
+              {electionConfig?.district?.trim() ? (
+                <span className="font-normal text-slate-500"> · {electionConfig.district.trim()}</span>
+              ) : null}
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+              {geoLoading
+                ? 'Loading administrative boundary data…'
+                : stateGeoJson
+                  ? 'State outline, configured district emphasis, and mapped operational units. Use zoom controls to navigate; map does not capture page scroll.'
+                  : 'Set the state under Settings → Election Configuration to load the administrative boundary. District name is used for the district highlight when coordinates are available.'}
+            </p>
+            <ul className="mt-3 flex flex-wrap gap-2" aria-label="Map status">
+              {stateGeoJson && (
+                <li className="inline-flex items-center rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+                  State boundary
+                </li>
+              )}
+              {districtHighlight && (
+                <li className="inline-flex items-center rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+                  District focus · {districtHighlight.label}
+                  <span className="ml-1.5 font-normal text-slate-400">
+                    {districtHighlight.source === 'area' ? 'CRM' : 'Geocoded'}
+                  </span>
+                </li>
+              )}
+              {areasWithCoords.length > 0 && (
+                <li className="inline-flex items-center rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+                  {areasWithCoords.length} mapped {areasWithCoords.length === 1 ? 'unit' : 'units'}
+                </li>
+              )}
+            </ul>
+          </div>
+          <aside className="w-full shrink-0 rounded-xl border border-slate-200/80 bg-slate-50/90 px-4 py-3 lg:w-64">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Legend</p>
+            <ul className="mt-2.5 space-y-2 text-xs text-slate-700">
+              {stateGeoJson && (
+                <li className="flex items-center gap-2.5">
+                  <span className="h-2 w-9 shrink-0 rounded-sm bg-slate-200 ring-1 ring-slate-400/50" aria-hidden />
+                  <span>Administrative boundary</span>
+                </li>
+              )}
+              {districtHighlight && (
+                <li className="flex items-center gap-2.5">
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full ring-2 ring-slate-800/25"
+                    style={{ backgroundColor: 'rgba(30, 41, 59, 0.2)' }}
+                    aria-hidden
+                  />
+                  <span>District emphasis</span>
+                </li>
+              )}
+              {sortedTypes.map((type) => (
+                <li key={type} className="flex items-center gap-2.5">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white shadow-sm"
+                    style={{ backgroundColor: AREA_COLORS[type] }}
+                    aria-hidden
+                  />
+                  <span className="font-medium text-slate-600">{type}</span>
+                  <span className="ml-auto tabular-nums text-slate-500">{groupedByType[type].length}</span>
+                </li>
+              ))}
+              {sortedTypes.length === 0 && !stateGeoJson && !districtHighlight && (
+                <li className="text-slate-500">No layers yet</li>
+              )}
+            </ul>
+          </aside>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {stateGeoJson && (
-            <span className="flex items-center gap-1.5 text-xs">
-              <span className="w-4 h-2.5 rounded-sm inline-block border-2 border-blue-700" style={{ backgroundColor: 'rgba(59,130,246,0.15)' }} />
-              State Boundary
-            </span>
-          )}
-          {sortedTypes.map(type => (
-            <span key={type} className="flex items-center gap-1.5 text-xs">
-              <span
-                className="w-3 h-3 rounded-full inline-block border-2 border-white shadow-sm"
-                style={{ backgroundColor: AREA_COLORS[type] }}
-              />
-              {type} ({groupedByType[type].length})
-            </span>
-          ))}
-        </div>
-      </div>
+      </header>
 
-      <div className="h-[500px] w-full relative z-0" style={{ backgroundColor: '#fff' }}>
-        <MapContainer
-          center={mapCenter}
-          zoom={stateGeoJson ? 7 : 6}
-          style={{ height: '100%', width: '100%', background: '#fff' }}
-          scrollWheelZoom={true}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+      <div className="relative bg-slate-100 px-1 pb-1 pt-1 sm:px-2 sm:pb-2 sm:pt-2">
+        {geoLoading && (
+          <div
+            className="absolute inset-1 z-[500] flex items-center justify-center rounded-lg bg-slate-100/75 backdrop-blur-[2px] sm:inset-2"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-3 shadow-lg">
+              <div
+                className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700"
+                aria-hidden
+              />
+              <span className="text-sm font-medium text-slate-700">Loading boundary…</span>
+            </div>
+          </div>
+        )}
+        <div className="constituency-map-frame relative z-0 h-[min(32rem,70vh)] min-h-[22rem] w-full overflow-hidden rounded-lg ring-1 ring-slate-200/90 shadow-inner">
+          <MapContainer
+            center={mapCenter}
+            zoom={stateGeoJson ? 7 : 6}
+            className="h-full w-full bg-slate-100"
+            style={{ height: '100%', width: '100%' }}
+            scrollWheelZoom={false}
+            zoomControl
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              subdomains="abcd"
+              maxZoom={20}
+            />
 
           {maskGeoJson && (
             <GeoJSON key={`mask-${electionConfig?.state}`} data={maskGeoJson} style={() => maskStyle} />
@@ -625,6 +794,27 @@ function ConstituencyMap({ areas, electionConfig }) {
             </>
           )}
 
+          {districtHighlight && (
+            <Circle
+              center={[districtHighlight.lat, districtHighlight.lng]}
+              radius={DISTRICT_HIGHLIGHT_RADIUS_M}
+              pathOptions={districtCircleStyle}
+            >
+              <LeafletTooltip
+                direction="top"
+                offset={[0, -6]}
+                opacity={1}
+                permanent={false}
+                className="leaflet-district-tooltip"
+              >
+                <span className="font-medium">
+                  District: {districtHighlight.label}
+                  {electionConfig?.state ? ` · ${electionConfig.state}` : ''}
+                </span>
+              </LeafletTooltip>
+            </Circle>
+          )}
+
           {!stateGeoJson && areasWithCoords.length > 0 && (
             <FitToMarkers areas={areasWithCoords} hasStateGeo={false} />
           )}
@@ -635,55 +825,93 @@ function ConstituencyMap({ areas, electionConfig }) {
               position={[area.coordinates.latitude, area.coordinates.longitude]}
               icon={createMarkerIcon(area.type)}
             >
-              <Popup>
-                <div className="min-w-[200px] p-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: AREA_COLORS[area.type] }} />
-                    <span className="font-bold text-gray-800">{area.name}</span>
+              <Popup className="crm-map-popup">
+                <div className="px-4 py-3">
+                  <div className="flex items-start gap-2.5 border-b border-slate-100 pb-2.5">
+                    <span
+                      className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-slate-200"
+                      style={{ backgroundColor: AREA_COLORS[area.type] }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-snug text-slate-900">{area.name}</p>
+                      <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        {area.type}
+                        {area.code ? ` · ${area.code}` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">{area.type}{area.code ? ` • ${area.code}` : ''}</p>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between"><span className="text-gray-500">Voters:</span><span className="font-semibold">{area.voterCount || 0}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Registered:</span><span className="font-semibold">{area.registeredVoters || 0}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Male / Female:</span><span className="font-semibold">{area.maleVoters || 0} / {area.femaleVoters || 0}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Workers:</span><span className="font-semibold">{area.workerCount || 0}</span></div>
+                  <dl className="mt-3 space-y-2 text-[13px]">
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-slate-500">Voters</dt>
+                      <dd className="font-semibold tabular-nums text-slate-900">{area.voterCount || 0}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-slate-500">Registered</dt>
+                      <dd className="font-semibold tabular-nums text-slate-900">{area.registeredVoters || 0}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-slate-500">Male / female</dt>
+                      <dd className="font-semibold tabular-nums text-slate-900">
+                        {area.maleVoters || 0} / {area.femaleVoters || 0}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-slate-500">Workers</dt>
+                      <dd className="font-semibold tabular-nums text-slate-900">{area.workerCount || 0}</dd>
+                    </div>
                     {area.assignedManager && (
-                      <div className="flex justify-between border-t pt-1 mt-1"><span className="text-gray-500">Manager:</span><span className="font-semibold">{area.assignedManager.name}</span></div>
+                      <div className="flex justify-between gap-4 border-t border-slate-100 pt-2">
+                        <dt className="text-slate-500">Manager</dt>
+                        <dd className="max-w-[55%] text-right font-medium text-slate-800">{area.assignedManager.name}</dd>
+                      </div>
                     )}
-                  </div>
+                  </dl>
                 </div>
               </Popup>
             </Marker>
           ))}
         </MapContainer>
+        </div>
       </div>
 
       {areasWithoutCoords.length > 0 && (
-        <div className="px-5 py-3 bg-amber-50 border-t border-amber-200">
-          <p className="text-sm text-amber-700 flex items-center gap-2">
-            <FiNavigation className="w-4 h-4 shrink-0" />
+        <div className="border-t border-amber-200/80 bg-amber-50/50 px-6 py-3.5">
+          <p className="flex items-start gap-2.5 text-sm leading-relaxed text-amber-950/80">
+            <FiNavigation className="mt-0.5 h-4 w-4 shrink-0 text-amber-700/90" aria-hidden />
             <span>
-              <strong>{areasWithoutCoords.length} areas</strong> without coordinates — edit them in Areas page to show on map.
+              <span className="font-semibold">{areasWithoutCoords.length}</span>{' '}
+              {areasWithoutCoords.length === 1 ? 'area has' : 'areas have'} no map coordinates. Add latitude and
+              longitude under <strong className="font-semibold">Areas</strong> to include them on this view.
             </span>
           </p>
         </div>
       )}
 
       {areas.length > 0 && (
-        <div className="p-5 pt-3 border-t border-gray-100">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Area Summary</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            {areas.map(area => (
-              <div key={area._id} className="rounded-lg border border-gray-200 p-2.5 hover:shadow-md hover:border-primary-300 transition-all">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: AREA_COLORS[area.type] }} />
-                  <p className="text-sm font-medium text-gray-800 truncate">{area.name}</p>
+        <div className="border-t border-slate-100 bg-slate-50/40 px-6 py-5">
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Operational coverage</h4>
+          <p className="mt-1 text-xs text-slate-500">Counts reflect your current data scope.</p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {areas.map((area) => (
+              <div
+                key={area._id}
+                className="rounded-lg border border-slate-200/90 bg-white p-3 shadow-sm transition-shadow hover:border-slate-300 hover:shadow-md"
+              >
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full ring-2 ring-slate-100"
+                    style={{ backgroundColor: AREA_COLORS[area.type] }}
+                  />
+                  <p className="truncate text-sm font-medium text-slate-800">{area.name}</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="font-semibold text-primary-600">{area.voterCount || 0}v</span>
-                  <span>{area.workerCount || 0}w</span>
+                <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                  <span className="font-semibold tabular-nums text-slate-700">{area.voterCount || 0} voters</span>
+                  <span className="text-slate-400">·</span>
+                  <span className="tabular-nums">{area.workerCount || 0} workers</span>
                   {!area.coordinates?.latitude && (
-                    <span className="text-amber-500 ml-auto" title="No coordinates"><FiMapPin className="w-3 h-3" /></span>
+                    <span className="ml-auto text-amber-600" title="Coordinates not set">
+                      <FiMapPin className="h-3.5 w-3.5" />
+                    </span>
                   )}
                 </div>
               </div>
@@ -691,7 +919,7 @@ function ConstituencyMap({ areas, electionConfig }) {
           </div>
         </div>
       )}
-    </div>
+    </section>
   )
 }
 

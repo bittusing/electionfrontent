@@ -96,7 +96,7 @@ function AppRoutes() {
           </RequirePermission>
         } />
         <Route path="analytics" element={
-          <RequirePermission module="reports" action="viewAll">
+          <RequirePermission module="reports" action="view">
             <Analytics />
           </RequirePermission>
         } />

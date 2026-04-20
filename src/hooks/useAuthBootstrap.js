@@ -3,11 +3,15 @@ import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 
 export function useAuthBootstrap() {
-  const { token, permissions, setPermissions, setAuth, logout } = useAuthStore()
+  const { token, permissions, setPermissions, setAuth, setWorkScope, logout } = useAuthStore()
   const bootstrapped = useRef(false)
 
   useEffect(() => {
-    if (!token || bootstrapped.current) return
+    if (!token) {
+      bootstrapped.current = false
+      return
+    }
+    if (bootstrapped.current) return
     bootstrapped.current = true
 
     const bootstrap = async () => {
@@ -30,6 +34,15 @@ export function useAuthBootstrap() {
             role: user.role,
             assignedAreas: user.assignedAreas || []
           }, token)
+        }
+
+        try {
+          const { data: scopeData } = await api.get('/auth/work-scope')
+          if (scopeData.success && scopeData.data) {
+            setWorkScope(scopeData.data)
+          }
+        } catch {
+          setWorkScope(null)
         }
       } catch (error) {
         if (error.response?.status === 401) {

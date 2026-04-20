@@ -9,6 +9,8 @@ export const useAuthStore = create(
       permissions: null,
       role: null,
       assignedAreas: [],
+      /** Booth / volunteer: which areas APIs use + breadcrumbs (from GET /auth/work-scope). */
+      workScope: null,
 
       setAuth: (user, token) => set({
         user,
@@ -18,12 +20,15 @@ export const useAuthStore = create(
 
       setPermissions: (permissions, role) => set({ permissions, role }),
 
+      setWorkScope: (workScope) => set({ workScope }),
+
       logout: () => set({
         user: null,
         token: null,
         permissions: null,
         role: null,
-        assignedAreas: []
+        assignedAreas: [],
+        workScope: null,
       }),
 
       hasPermission: (module, action = 'view') => {
