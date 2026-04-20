@@ -1,8 +1,65 @@
 import { useState, useEffect } from 'react'
-import { FiPlus, FiMap, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
+import { FiPlus, FiMap, FiEdit2, FiTrash2, FiX, FiFlag } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
+
+function FieldCampaignSignage({ area, onSaved }) {
+  const [status, setStatus] = useState(area.fieldCampaign?.signageStatus || 'NONE')
+  const [notes, setNotes] = useState(area.fieldCampaign?.signageNotes || '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setStatus(area.fieldCampaign?.signageStatus || 'NONE')
+    setNotes(area.fieldCampaign?.signageNotes || '')
+  }, [area._id, area.fieldCampaign?.signageStatus, area.fieldCampaign?.signageNotes])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const { data } = await api.patch(`/areas/${area._id}/field-campaign`, {
+        signageStatus: status,
+        signageNotes: notes,
+      })
+      if (data.success) {
+        toast.success('Signage status saved')
+        onSaved()
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not update signage')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-primary-100/60 bg-primary-50/20 rounded-lg px-3 py-3">
+      <div className="flex items-center gap-2 text-xs font-semibold text-gray-800 mb-2">
+        <FiFlag className="text-primary-600" />
+        Field: posters / village signage
+      </div>
+      <select
+        value={status}
+        onChange={(e) => setStatus(e.target.value)}
+        className="input-field text-sm mb-2"
+      >
+        <option value="NONE">Not deployed</option>
+        <option value="PARTIAL">Partial coverage</option>
+        <option value="COMPLETE">Fully covered</option>
+      </select>
+      <input
+        type="text"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        className="input-field text-sm mb-2"
+        placeholder="Short note (optional)"
+      />
+      <button type="button" onClick={save} disabled={saving} className="btn-primary w-full text-sm py-2">
+        {saving ? 'Saving…' : 'Save signage'}
+      </button>
+    </div>
+  )
+}
 
 export default function Areas() {
   const { permissions } = useAuthStore()
@@ -151,6 +208,10 @@ export default function Areas() {
                   </span>
                 </div>
               </div>
+
+              {['VILLAGE', 'WARD', 'BOOTH'].includes(area.type) && permissions?.voters?.edit && (
+                <FieldCampaignSignage area={area} onSaved={fetchAreas} />
+              )}
 
               {(permissions?.areas?.edit || permissions?.areas?.delete) && (
                 <div className="flex gap-2 pt-3 border-t border-gray-100">

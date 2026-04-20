@@ -7,22 +7,22 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-primary-50/40">
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      
+
       <div className="lg:pl-64">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        
-        <main className="py-6 px-4 sm:px-6 lg:px-8">
+
+        <main className="py-6 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto">
           <Outlet />
         </main>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden
         />
       )}
     </div>

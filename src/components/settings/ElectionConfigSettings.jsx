@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiSave, FiMapPin } from 'react-icons/fi'
+import { FiSave, FiMapPin, FiPlus, FiTrash2, FiBarChart2 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import api from '../../utils/api'
 import { useAuthStore } from '../../store/authStore'
@@ -39,6 +39,7 @@ export default function ElectionConfigSettings() {
     totalRegisteredVoters: 0,
     totalBooths: 0,
     totalWards: 0,
+    pastElectionComparison: [],
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -65,6 +66,14 @@ export default function ElectionConfigSettings() {
           totalRegisteredVoters: config.totalRegisteredVoters || 0,
           totalBooths: config.totalBooths || 0,
           totalWards: config.totalWards || 0,
+          pastElectionComparison: Array.isArray(config.pastElectionComparison)
+            ? config.pastElectionComparison.map((r) => ({
+                label: r.label || '',
+                year: r.year || '',
+                value: typeof r.value === 'number' ? r.value : Number(r.value) || 0,
+                barColor: r.barColor || '',
+              }))
+            : [],
         })
       }
     } catch (error) {
@@ -80,7 +89,18 @@ export default function ElectionConfigSettings() {
 
     setSaving(true)
     try {
-      const { data } = await api.put('/election-config', formData)
+      const payload = {
+        ...formData,
+        pastElectionComparison: (formData.pastElectionComparison || [])
+          .filter((r) => r.label && String(r.label).trim())
+          .map((r) => ({
+            label: String(r.label).trim(),
+            year: r.year ? String(r.year).trim() : '',
+            value: Math.min(100, Math.max(0, Number(r.value) || 0)),
+            barColor: r.barColor ? String(r.barColor).trim() : '',
+          })),
+      }
+      const { data } = await api.put('/election-config', payload)
       if (data.success) {
         toast.success('Election configuration saved successfully')
       }
@@ -93,6 +113,31 @@ export default function ElectionConfigSettings() {
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const addComparisonRow = () => {
+    setFormData((prev) => ({
+      ...prev,
+      pastElectionComparison: [
+        ...(prev.pastElectionComparison || []),
+        { label: '', year: '', value: 40, barColor: '' },
+      ],
+    }))
+  }
+
+  const updateComparisonRow = (index, field, value) => {
+    setFormData((prev) => {
+      const rows = [...(prev.pastElectionComparison || [])]
+      rows[index] = { ...rows[index], [field]: value }
+      return { ...prev, pastElectionComparison: rows }
+    })
+  }
+
+  const removeComparisonRow = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      pastElectionComparison: (prev.pastElectionComparison || []).filter((_, i) => i !== index),
+    }))
   }
 
   if (loading) {
@@ -259,6 +304,104 @@ export default function ElectionConfigSettings() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Past election comparison (dashboard bar chart) */}
+        <div className="card">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
+              <FiBarChart2 className="w-5 h-5 text-primary-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Past election comparison</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Add bars for previous Vidhan Sabha / Lok Sabha / local body results (vote share % or any 0–100 score).
+                These appear on the main dashboard chart next to your live supporter survey from voters.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {(formData.pastElectionComparison || []).map((row, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50"
+              >
+                <div className="md:col-span-4">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Label</label>
+                  <input
+                    type="text"
+                    value={row.label}
+                    onChange={(e) => updateComparisonRow(index, 'label', e.target.value)}
+                    className="input-field"
+                    placeholder="e.g. Vidhan Sabha 2022 (BJP)"
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
+                  <input
+                    type="text"
+                    value={row.year}
+                    onChange={(e) => updateComparisonRow(index, 'year', e.target.value)}
+                    className="input-field"
+                    placeholder="2022"
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Value (0–100)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={row.value}
+                    onChange={(e) => updateComparisonRow(index, 'value', parseFloat(e.target.value) || 0)}
+                    className="input-field"
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Bar colour</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={row.barColor || '#2563eb'}
+                      onChange={(e) => updateComparisonRow(index, 'barColor', e.target.value)}
+                      className="h-10 w-14 rounded-lg border border-gray-200 cursor-pointer bg-white"
+                      disabled={!canEdit}
+                    />
+                    <input
+                      type="text"
+                      value={row.barColor}
+                      onChange={(e) => updateComparisonRow(index, 'barColor', e.target.value)}
+                      className="input-field flex-1 font-mono text-xs"
+                      placeholder="#2563eb"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                </div>
+                <div className="md:col-span-2 flex items-end">
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => removeComparisonRow(index)}
+                      className="btn-danger w-full justify-center py-2.5"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {canEdit && (
+            <button type="button" onClick={addComparisonRow} className="btn-secondary mt-4 inline-flex items-center gap-2">
+              <FiPlus className="w-4 h-4" />
+              Add comparison row
+            </button>
+          )}
         </div>
 
         {/* Stats */}

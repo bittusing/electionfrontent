@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FiPlus, FiCalendar, FiMapPin, FiUsers, FiX } from 'react-icons/fi'
+import { FiPlus, FiCalendar, FiMapPin, FiUsers, FiX, FiChevronDown, FiChevronUp } from 'react-icons/fi'
 import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
@@ -10,6 +10,9 @@ export default function Rallies() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('upcoming')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [audienceOpenId, setAudienceOpenId] = useState(null)
+  const [audienceById, setAudienceById] = useState({})
+  const [audienceLoadingId, setAudienceLoadingId] = useState(null)
 
   useEffect(() => {
     fetchRallies()
@@ -27,6 +30,27 @@ export default function Rallies() {
       toast.error('Failed to load rallies')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const toggleAudience = async (rallyId) => {
+    if (audienceOpenId === rallyId) {
+      setAudienceOpenId(null)
+      return
+    }
+    setAudienceOpenId(rallyId)
+    if (audienceById[rallyId]) return
+    setAudienceLoadingId(rallyId)
+    try {
+      const { data } = await api.get(`/rallies/${rallyId}/audience`)
+      if (data.success) {
+        setAudienceById((prev) => ({ ...prev, [rallyId]: data.data }))
+      }
+    } catch {
+      toast.error('Could not load meeting audience')
+      setAudienceOpenId(null)
+    } finally {
+      setAudienceLoadingId(null)
     }
   }
 
@@ -120,9 +144,44 @@ export default function Rallies() {
                       <FiUsers className="w-4 h-4" />
                       <span>Expected: {rally.expectedAttendees || 0} attendees</span>
                     </div>
+                    {rally.areaId && (
+                      <p className="text-xs text-gray-500">
+                        Area: {typeof rally.areaId === 'object' ? rally.areaId.name : '—'} (
+                        {typeof rally.areaId === 'object' ? rally.areaId.type : '—'})
+                      </p>
+                    )}
                   </div>
                 </div>
+                <div className="lg:shrink-0 w-full lg:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => toggleAudience(rally._id)}
+                    className="btn-secondary text-sm w-full lg:w-auto inline-flex items-center justify-center gap-2"
+                  >
+                    {audienceOpenId === rally._id ? (
+                      <>
+                        <FiChevronUp className="w-4 h-4" />
+                        Hide audience
+                      </>
+                    ) : (
+                      <>
+                        <FiChevronDown className="w-4 h-4" />
+                        Meeting audience
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+              {audienceOpenId === rally._id && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  {audienceLoadingId === rally._id && (
+                    <p className="text-sm text-gray-500">Loading voter summary…</p>
+                  )}
+                  {audienceById[rally._id] && (
+                    <MeetingAudienceSummary data={audienceById[rally._id]} />
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -137,6 +196,47 @@ export default function Rallies() {
           }}
         />
       )}
+    </div>
+  )
+}
+
+function supportLabel(key) {
+  const m = {
+    STRONG_SUPPORTER: 'Strong supporter',
+    SUPPORTER: 'Supporter',
+    NEUTRAL: 'Neutral',
+    OPPONENT: 'Opponent',
+    UNKNOWN: 'Not set',
+  }
+  return m[key] || key || '—'
+}
+
+function MeetingAudienceSummary({ data }) {
+  if (data.hint) {
+    return <p className="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2">{data.hint}</p>
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase">Voters in scope</p>
+        <p className="text-2xl font-bold text-gray-900 mt-1">{data.voterTotal ?? 0}</p>
+        <p className="text-sm text-gray-600 mt-2">With mobile: {data.votersWithPhone ?? 0}</p>
+        <p className="text-xs text-gray-500 mt-1">Areas matched: {data.areasMatched ?? 0}</p>
+      </div>
+      <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase">By support level</p>
+        <ul className="mt-2 space-y-1 text-sm">
+          {(data.bySupportLevel || []).map((row) => (
+            <li key={row._id || 'x'} className="flex justify-between">
+              <span className="text-gray-600">{supportLabel(row._id)}</span>
+              <span className="font-semibold">{row.count}</span>
+            </li>
+          ))}
+          {(!data.bySupportLevel || data.bySupportLevel.length === 0) && (
+            <li className="text-gray-500 text-sm">No voters in these areas yet.</li>
+          )}
+        </ul>
+      </div>
     </div>
   )
 }

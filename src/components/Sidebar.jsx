@@ -34,38 +34,38 @@ export default function Sidebar({ open, setOpen }) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white border-r border-gray-200">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white/95 backdrop-blur-md border-r border-gray-200/90 shadow-soft border-l-4 border-l-primary-500">
         <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex items-center h-16 px-6 border-b border-gray-200">
-            <span className="text-2xl mr-2">🗳️</span>
-            <span className="text-xl font-bold text-gray-800">Election CRM</span>
+          <div className="flex items-center h-16 px-5 border-b border-gray-100 bg-gradient-to-r from-primary-50/80 to-white">
+            <span className="text-2xl mr-2" aria-hidden>🗳️</span>
+            <span className="text-lg font-bold text-gray-900 tracking-tight">Election CRM</span>
           </div>
 
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                <span className="text-primary-600 font-semibold">
+              <div className="w-11 h-11 rounded-xl bg-primary-100 ring-2 ring-primary-200/60 flex items-center justify-center shadow-sm">
+                <span className="text-primary-700 font-bold text-sm">
                   {user?.name?.charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">{user?.name}</p>
-                <p className="text-xs text-gray-500">{displayRole}</p>
+              <div className="ml-3 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">{user?.name}</p>
+                <p className="text-xs text-gray-500 truncate">{displayRole}</p>
               </div>
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
             {visibleMenuItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path === '/'}
                 className={({ isActive }) =>
-                  `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
                     isActive
-                      ? 'bg-primary-50 text-primary-600'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
+                      : 'text-gray-700 hover:bg-primary-50/80 hover:text-primary-800'
                   }`
                 }
               >
@@ -79,36 +79,36 @@ export default function Sidebar({ open, setOpen }) {
 
       {/* Mobile Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-white/98 backdrop-blur-md border-r border-gray-200 shadow-xl border-l-4 border-l-primary-500 transform transition-transform duration-300 ease-out lg:hidden ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <div className="flex items-center">
-              <span className="text-2xl mr-2">🗳️</span>
-              <span className="text-xl font-bold text-gray-800">Election CRM</span>
+          <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 bg-gradient-to-r from-primary-50/80 to-white">
+            <div className="flex items-center min-w-0">
+              <span className="text-2xl mr-2 shrink-0" aria-hidden>🗳️</span>
+              <span className="text-lg font-bold text-gray-900 truncate">Election CRM</span>
             </div>
-            <button onClick={() => setOpen(false)} className="p-2 rounded-lg hover:bg-gray-100">
+            <button type="button" onClick={() => setOpen(false)} className="p-2 rounded-xl hover:bg-gray-100 shrink-0">
               <FiX className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                <span className="text-primary-600 font-semibold">
+              <div className="w-11 h-11 rounded-xl bg-primary-100 ring-2 ring-primary-200/60 flex items-center justify-center shadow-sm">
+                <span className="text-primary-700 font-bold text-sm">
                   {user?.name?.charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">{user?.name}</p>
-                <p className="text-xs text-gray-500">{displayRole}</p>
+              <div className="ml-3 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">{user?.name}</p>
+                <p className="text-xs text-gray-500 truncate">{displayRole}</p>
               </div>
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
             {visibleMenuItems.map((item) => (
               <NavLink
                 key={item.path}
@@ -116,10 +116,10 @@ export default function Sidebar({ open, setOpen }) {
                 end={item.path === '/'}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
                     isActive
-                      ? 'bg-primary-50 text-primary-600'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
+                      : 'text-gray-700 hover:bg-primary-50/80 hover:text-primary-800'
                   }`
                 }
               >

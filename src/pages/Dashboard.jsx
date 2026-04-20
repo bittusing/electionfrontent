@@ -1,12 +1,23 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import {
   FiUsers, FiMap, FiCheckSquare, FiCalendar,
-  FiUserCheck, FiMapPin, FiNavigation
+  FiUserCheck, FiMapPin, FiNavigation, FiHeart, FiInfo,
 } from 'react-icons/fi'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  CartesianGrid,
+} from 'recharts'
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
+import { useThemeStore } from '../store/themeStore'
 
 const INDIA_GEOJSON_URL =
   'https://gist.githubusercontent.com/jbrobst/56c13bbbf9d97d187fea01ca62ea5112/raw/e388c4cae20aa53cb5090210a42ebb9b765c0a36/india_states.geojson'
@@ -167,7 +178,7 @@ export default function Dashboard() {
       <ConstituencyHeader config={electionConfig} isAdmin={isAdmin} />
       {isAdmin
         ? <AdminDashboard stats={stats} areas={areas} electionConfig={electionConfig} />
-        : <WorkerDashboard />
+        : <WorkerDashboard stats={stats} electionConfig={electionConfig} />
       }
     </div>
   )
@@ -236,6 +247,162 @@ function ConstituencyHeader({ config, isAdmin }) {
             </div>
           )}
         </div>
+        <p className="text-xs text-primary-100/85 mt-4 pt-3 border-t border-white/15 flex items-start gap-2 max-w-3xl">
+          <FiInfo className="w-4 h-4 shrink-0 mt-0.5 opacity-90" />
+          <span>
+            Candidate name, party, election date and comparison chart rows are loaded from{' '}
+            <strong>Settings → Election Configuration</strong> (database). Update there to change this banner — nothing here is hard-coded test data.
+          </span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+const DEFAULT_CHART_COLORS = ['#2563eb', '#16a34a', '#ea580c', '#7c3aed', '#0891b2', '#db2777']
+
+function formatSupportKey(key) {
+  const labels = {
+    STRONG_SUPPORTER: 'Strong supporter',
+    SUPPORTER: 'Supporter',
+    NEUTRAL: 'Neutral',
+    OPPONENT: 'Opponent',
+    UNKNOWN: 'Not set',
+  }
+  return labels[key] || key || 'Unknown'
+}
+
+function SupporterCampaignCard({ snapshot }) {
+  const s = snapshot || {}
+  const decided = s.decidedVoters ?? 0
+  const mainPct =
+    decided > 0 ? s.supporterShareAmongDecidedPercent : s.supporterSharePercent
+  const display = typeof mainPct === 'number' ? mainPct : parseFloat(mainPct) || 0
+  const strong = s.strongSupporter ?? 0
+  const sup = s.supporter ?? 0
+  const total = s.totalVoters ?? 0
+
+  return (
+    <div className="card relative overflow-hidden border-primary-100/80 bg-gradient-to-br from-white to-primary-50/40">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/10 rounded-full -translate-y-1/2 translate-x-1/2" aria-hidden />
+      <div className="flex items-center gap-2 text-primary-700 mb-2">
+        <FiHeart className="w-5 h-5" />
+        <h3 className="text-sm font-semibold uppercase tracking-wide">Supporter strength</h3>
+      </div>
+      <p className="text-xs text-gray-600 mb-4">
+        From each voter&apos;s <strong>Support level</strong> (Strong supporter / Supporter / Neutral / Opponent). Update in{' '}
+        <strong>Voters</strong> when you survey.
+      </p>
+      <div className="flex items-end gap-2">
+        <span className="text-5xl font-bold text-primary-700 tabular-nums leading-none">{display}</span>
+        <span className="text-xl font-semibold text-primary-600 mb-1">%</span>
+      </div>
+      <p className="text-sm text-gray-600 mt-2">
+        {decided > 0 ? (
+          <>
+            <strong>Campaign lean</strong> among classified voters (excludes &quot;Not set&quot;).{' '}
+            <span className="text-gray-500">
+              {strong + sup} supporters / {decided} classified · {total} voters in scope
+            </span>
+          </>
+        ) : (
+          <>
+            Share of all voters: {s.supporterSharePercent ?? 0}% — set <strong>Support level</strong> on voters for a sharper read ({total} in scope).
+          </>
+        )}
+      </p>
+      <div className="mt-5 space-y-2 text-sm border-t border-gray-100 pt-4">
+        <div className="flex justify-between">
+          <span className="text-gray-600">Opposition (est.)</span>
+          <span className="font-semibold text-red-600">{s.oppositionSharePercent ?? 0}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Neutral</span>
+          <span className="font-semibold text-amber-700">{s.neutralSharePercent ?? 0}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Support not set</span>
+          <span className="font-semibold text-gray-500">{s.unknownSharePercent ?? 0}%</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PastElectionBarChart({ stats, electionConfig }) {
+  const primaryHex = useThemeStore((state) => state.primaryHex)
+  const rows = electionConfig?.pastElectionComparison || []
+  const snap = stats?.supporterSnapshot
+  const campaignPct =
+    snap && snap.decidedVoters > 0
+      ? snap.supporterShareAmongDecidedPercent
+      : snap?.supporterSharePercent ?? 0
+
+  const campaignLabel =
+    electionConfig?.partyName?.trim()
+      ? `This campaign (${electionConfig.partyName})`
+      : 'This campaign (field data)'
+
+  const chartData = [
+    ...rows.map((r, i) => ({
+      key: `hist-${i}`,
+      shortLabel: r.year ? `${r.label} (${r.year})` : r.label,
+      value: Math.min(100, Math.max(0, Number(r.value) || 0)),
+      fill: r.barColor?.trim() || DEFAULT_CHART_COLORS[i % DEFAULT_CHART_COLORS.length],
+    })),
+    {
+      key: 'campaign',
+      shortLabel: campaignLabel.length > 36 ? `${campaignLabel.slice(0, 34)}…` : campaignLabel,
+      value: Math.min(100, Math.max(0, Number(campaignPct) || 0)),
+      fill: primaryHex || '#2563eb',
+    },
+  ]
+
+  if (rows.length === 0 && (!snap || (snap.totalVoters ?? 0) === 0)) {
+    return (
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">Past elections vs campaign</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Add historical bars in <strong>Settings → Election Config → Past election comparison</strong>, and set voter{' '}
+          <strong>Support level</strong> to see your live bar.
+        </p>
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 py-16 text-center text-gray-500 text-sm">
+          No comparison rows yet — configure in Election settings.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-1">Past elections vs campaign</h3>
+      <p className="text-sm text-gray-500 mb-4">
+        Bars from your saved comparison list (Election settings) appear first; the <strong>last bar</strong> is live supporter % from voters in your area scope (same as the map).
+      </p>
+      <div className="h-[300px] w-full min-h-[280px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 64 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <XAxis
+              dataKey="shortLabel"
+              tick={{ fontSize: 11, fill: '#6b7280' }}
+              interval={0}
+              angle={-28}
+              textAnchor="end"
+              height={70}
+            />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" width={36} />
+            <Tooltip
+              formatter={(v) => [`${v}%`, 'Value']}
+              contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }}
+            />
+            <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={48}>
+              {chartData.map((entry) => (
+                <Cell key={entry.key} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
@@ -249,6 +416,32 @@ function AdminDashboard({ stats, areas, electionConfig }) {
         <StatCard icon={FiMap} title="Areas" value={stats?.totalAreas || 0} color="green" />
         <StatCard icon={FiUserCheck} title="Active Workers" value={stats?.activeWorkers || 0} color="purple" />
         <StatCard icon={FiCheckSquare} title="Tasks Completed" value={stats?.completedTasks || 0} color="orange" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <SupporterCampaignCard snapshot={stats?.supporterSnapshot} />
+        <div className="xl:col-span-2 card">
+          <PastElectionBarChart stats={stats} electionConfig={electionConfig} />
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Support level breakdown</h3>
+        {stats?.supporterSnapshot?.breakdown?.length ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {stats.supporterSnapshot.breakdown.map((row) => (
+              <div
+                key={row._id || 'na'}
+                className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3"
+              >
+                <span className="text-sm text-gray-700">{formatSupportKey(row._id)}</span>
+                <span className="text-lg font-bold text-gray-900 tabular-nums">{row.count}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm">No voters in scope yet.</p>
+        )}
       </div>
 
       <ConstituencyMap areas={areas} electionConfig={electionConfig} />
@@ -502,13 +695,21 @@ function ConstituencyMap({ areas, electionConfig }) {
   )
 }
 
-function WorkerDashboard() {
+function WorkerDashboard({ stats, electionConfig }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">My Dashboard</h1>
-        <p className="text-gray-600">Your daily work overview</p>
+        <h1 className="page-title">My Dashboard</h1>
+        <p className="page-subtitle">Your daily work overview</p>
       </div>
+      {stats?.supporterSnapshot != null && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <SupporterCampaignCard snapshot={stats.supporterSnapshot} />
+          <div className="lg:col-span-2 card">
+            <PastElectionBarChart stats={stats} electionConfig={electionConfig} />
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard icon={FiCheckSquare} title="My Tasks" value="View Tasks" color="blue" link="/tasks" />
         <StatCard icon={FiUsers} title="Voters" value="Manage Voters" color="green" link="/voters" />

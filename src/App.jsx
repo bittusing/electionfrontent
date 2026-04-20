@@ -21,6 +21,7 @@ import Users from './pages/Users'
 import Settings from './pages/Settings'
 
 import Layout from './components/Layout'
+import ThemeProvider from './components/ThemeProvider'
 
 const ProtectedRoute = ({ children }) => {
   const { token } = useAuthStore()
@@ -114,7 +115,9 @@ function App() {
   return (
     <>
       <Router>
-        <AppRoutes />
+        <ThemeProvider>
+          <AppRoutes />
+        </ThemeProvider>
       </Router>
 
       <Toaster

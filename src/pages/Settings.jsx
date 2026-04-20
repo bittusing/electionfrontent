@@ -7,6 +7,7 @@ import SMSSettings from '../components/settings/SMSSettings'
 import EmailSettings from '../components/settings/EmailSettings'
 import TemplateSettings from '../components/settings/TemplateSettings'
 import ElectionConfigSettings from '../components/settings/ElectionConfigSettings'
+import ThemeAppearanceSettings from '../components/settings/ThemeAppearanceSettings'
 
 export default function Settings() {
   const { permissions, user, role, setAuth, token } = useAuthStore()
@@ -18,7 +19,7 @@ export default function Settings() {
 
   useEffect(() => {
     const hash = window.location.hash.replace('#', '')
-    const validTabs = ['profile', 'election', 'whatsapp', 'sms', 'email', 'templates']
+    const validTabs = ['profile', 'appearance', 'election', 'whatsapp', 'sms', 'email', 'templates']
     if (hash && validTabs.includes(hash)) {
       setActiveTab(hash)
     }
@@ -31,6 +32,7 @@ export default function Settings() {
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: '👤' },
+    { id: 'appearance', label: 'Theme & colours', icon: '🎨' },
     { id: 'election', label: 'Election Config', icon: '🗳️', show: isAdmin || canViewSettings },
     { id: 'whatsapp', label: 'WhatsApp', icon: '💬', show: canViewSettings },
     { id: 'sms', label: 'SMS', icon: '📱', show: canViewSettings },
@@ -43,8 +45,8 @@ export default function Settings() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-        <p className="text-gray-600 mt-1">Manage your account and system settings</p>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">Manage your account and system settings</p>
       </div>
 
       {/* Tab Navigation */}
@@ -57,7 +59,7 @@ export default function Settings() {
               className={`
                 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap
                 ${activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }
               `}
@@ -74,6 +76,8 @@ export default function Settings() {
         {activeTab === 'profile' && (
           <ProfileSettings user={user} token={token} setAuth={setAuth} />
         )}
+
+        {activeTab === 'appearance' && <ThemeAppearanceSettings />}
 
         {activeTab === 'election' && <ElectionConfigSettings />}
         {activeTab === 'whatsapp' && <WhatsAppSettings />}
