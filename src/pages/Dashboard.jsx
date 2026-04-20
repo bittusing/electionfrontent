@@ -482,7 +482,7 @@ function AdminDashboard({ stats, areas, electionConfig }) {
         )}
       </div>
 
-      <ConstituencyMap areas={areas} electionConfig={electionConfig} />
+      <ConstituencyMap areas={areas} electionConfig={electionConfig} dashboardStats={stats} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
@@ -516,7 +516,7 @@ function AdminDashboard({ stats, areas, electionConfig }) {
   )
 }
 
-function ConstituencyMap({ areas, electionConfig }) {
+function ConstituencyMap({ areas, electionConfig, dashboardStats }) {
   const [stateGeoJson, setStateGeoJson] = useState(null)
   const [geoLoading, setGeoLoading] = useState(false)
   const geoRef = useRef(null)
@@ -630,28 +630,65 @@ function ConstituencyMap({ areas, electionConfig }) {
     return buildMaskGeoJson(stateGeoJson)
   }, [stateGeoJson])
 
-  const maskStyle = { color: 'transparent', fillColor: '#f1f5f9', fillOpacity: 0.92, weight: 0 }
+  const maskStyle = { color: 'transparent', fillColor: '#e8eefc', fillOpacity: 0.88, weight: 0 }
 
   const stateStyle = {
-    color: '#334155',
-    weight: 2,
-    fillColor: '#475569',
-    fillOpacity: 0.06,
+    color: '#1d4ed8',
+    weight: 2.5,
+    fillColor: '#3b82f6',
+    fillOpacity: 0.14,
     dashArray: '',
   }
 
   const stateHoverStyle = {
-    weight: 2.5,
-    fillOpacity: 0.1,
-    fillColor: '#475569',
+    weight: 3,
+    fillOpacity: 0.24,
+    fillColor: '#2563eb',
   }
 
   const districtCircleStyle = {
-    color: '#0f172a',
-    weight: 2,
-    fillColor: '#1e293b',
-    fillOpacity: 0.07,
+    color: '#c2410c',
+    weight: 2.5,
+    fillColor: '#f59e0b',
+    fillOpacity: 0.2,
   }
+
+  const areaSumVoters = useMemo(
+    () => areas.reduce((s, a) => s + (Number(a.voterCount) || 0), 0),
+    [areas]
+  )
+  const areaSumRegistered = useMemo(
+    () => areas.reduce((s, a) => s + (Number(a.registeredVoters) || 0), 0),
+    [areas]
+  )
+  const areaSumWorkers = useMemo(
+    () => areas.reduce((s, a) => s + (Number(a.workerCount) || 0), 0),
+    [areas]
+  )
+  const areaSumMale = useMemo(
+    () => areas.reduce((s, a) => s + (Number(a.maleVoters) || 0), 0),
+    [areas]
+  )
+  const areaSumFemale = useMemo(
+    () => areas.reduce((s, a) => s + (Number(a.femaleVoters) || 0), 0),
+    [areas]
+  )
+
+  const headlineVoters =
+    typeof dashboardStats?.totalVoters === 'number' ? dashboardStats.totalVoters : areaSumVoters
+
+  const unitRows = useMemo(() => {
+    const rows = areas.filter((a) => a.type !== 'STATE')
+    const sorted = [...rows].sort(
+      (a, b) => (Number(b.voterCount) || 0) - (Number(a.voterCount) || 0)
+    )
+    if (sorted.length > 0) return sorted
+    return [...areas].sort((a, b) => (Number(b.voterCount) || 0) - (Number(a.voterCount) || 0))
+  }, [areas])
+
+  const scopeMismatch =
+    typeof dashboardStats?.totalVoters === 'number' &&
+    areaSumVoters !== dashboardStats.totalVoters
 
   const onEachFeature = (feature, layer) => {
     layer.on({
@@ -712,15 +749,19 @@ function ConstituencyMap({ areas, electionConfig }) {
             <ul className="mt-2.5 space-y-2 text-xs text-slate-700">
               {stateGeoJson && (
                 <li className="flex items-center gap-2.5">
-                  <span className="h-2 w-9 shrink-0 rounded-sm bg-slate-200 ring-1 ring-slate-400/50" aria-hidden />
+                  <span
+                    className="h-2 w-9 shrink-0 rounded-sm ring-1 ring-blue-600/35"
+                    style={{ background: 'linear-gradient(180deg, rgba(59,130,246,0.35), rgba(37,99,235,0.2))' }}
+                    aria-hidden
+                  />
                   <span>Administrative boundary</span>
                 </li>
               )}
               {districtHighlight && (
                 <li className="flex items-center gap-2.5">
                   <span
-                    className="h-3 w-3 shrink-0 rounded-full ring-2 ring-slate-800/25"
-                    style={{ backgroundColor: 'rgba(30, 41, 59, 0.2)' }}
+                    className="h-3 w-3 shrink-0 rounded-full ring-2 ring-amber-600/40"
+                    style={{ backgroundColor: 'rgba(245, 158, 11, 0.45)' }}
                     aria-hidden
                   />
                   <span>District emphasis</span>
@@ -745,10 +786,10 @@ function ConstituencyMap({ areas, electionConfig }) {
         </div>
       </header>
 
-      <div className="relative bg-slate-100 px-1 pb-1 pt-1 sm:px-2 sm:pb-2 sm:pt-2">
+      <div className="relative bg-gradient-to-br from-sky-50/80 via-slate-50 to-indigo-50/50 px-1 pb-1 pt-1 sm:px-2 sm:pb-2 sm:pt-2">
         {geoLoading && (
           <div
-            className="absolute inset-1 z-[500] flex items-center justify-center rounded-lg bg-slate-100/75 backdrop-blur-[2px] sm:inset-2"
+            className="absolute inset-1 z-[500] flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[2px] sm:inset-2"
             role="status"
             aria-live="polite"
           >
@@ -761,18 +802,19 @@ function ConstituencyMap({ areas, electionConfig }) {
             </div>
           </div>
         )}
-        <div className="constituency-map-frame relative z-0 h-[min(32rem,70vh)] min-h-[22rem] w-full overflow-hidden rounded-lg ring-1 ring-slate-200/90 shadow-inner">
-          <MapContainer
-            center={mapCenter}
-            zoom={stateGeoJson ? 7 : 6}
-            className="h-full w-full bg-slate-100"
-            style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={false}
-            zoomControl
-          >
+        <div className="flex min-h-[min(22rem,55vh)] flex-col xl:h-[min(34rem,72vh)] xl:flex-row xl:items-stretch xl:gap-0">
+          <div className="constituency-map-frame relative z-0 h-[min(28rem,62vh)] min-h-[20rem] w-full min-w-0 flex-1 overflow-hidden rounded-lg ring-1 ring-slate-200/80 shadow-md xl:h-full xl:min-h-0 xl:rounded-r-none xl:shadow-inner">
+            <MapContainer
+              center={mapCenter}
+              zoom={stateGeoJson ? 7 : 6}
+              className="h-full w-full bg-sky-50/40"
+              style={{ height: '100%', width: '100%' }}
+              scrollWheelZoom={false}
+              zoomControl
+            >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               subdomains="abcd"
               maxZoom={20}
             />
@@ -870,7 +912,99 @@ function ConstituencyMap({ areas, electionConfig }) {
               </Popup>
             </Marker>
           ))}
-        </MapContainer>
+            </MapContainer>
+          </div>
+
+          <aside className="flex w-full min-h-0 flex-col border-t border-slate-200/90 bg-white/95 xl:w-[min(26rem,100%)] xl:max-w-md xl:shrink-0 xl:border-l xl:border-t-0 xl:overflow-hidden">
+            <div className="border-b border-slate-100 bg-gradient-to-br from-primary-600 via-primary-700 to-indigo-800 px-4 py-4 text-white">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-100/90">
+                {electionConfig?.constituencyType === 'VIDHANSABHA' ? 'Vidhan Sabha' : 'Constituency'} · voter tally
+              </p>
+              <h4 className="mt-1 text-lg font-semibold leading-snug">
+                {electionConfig?.constituencyName?.trim() || 'Constituency scope'}
+              </h4>
+              <p className="mt-1.5 text-xs leading-relaxed text-primary-100/95">
+                Voters and workers by area unit (district / city / ward / booth as in your hierarchy). Colours match
+                map markers.
+              </p>
+              <p className="mt-1 text-[11px] text-amber-100/90">
+                क्षेत्र के अनुसार मतदाता संख्या — नीचे सूची में विवरण।
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 p-3">
+              <div className="rounded-xl border border-primary-100 bg-gradient-to-br from-primary-50 to-white p-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary-700/80">Total voters</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-primary-900">{headlineVoters}</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">Dashboard scope</p>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800/80">Registered</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-900">{areaSumRegistered}</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">Sum on units</p>
+              </div>
+              <div className="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-800/80">Workers</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-violet-900">{areaSumWorkers}</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">Assigned</p>
+              </div>
+              <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">Male / female</p>
+                <p className="mt-1 text-lg font-bold tabular-nums text-amber-950">
+                  {areaSumMale} <span className="text-amber-700/80">/</span> {areaSumFemale}
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-500">On listed units</p>
+              </div>
+            </div>
+
+            {scopeMismatch && (
+              <p className="mx-3 mb-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-900 ring-1 ring-amber-100">
+                Listed units add up to <strong>{areaSumVoters}</strong> voters; dashboard total is{' '}
+                <strong>{dashboardStats.totalVoters}</strong> (full query may include voters outside these area rows).
+              </p>
+            )}
+
+            <div className="flex min-h-0 flex-1 flex-col border-t border-slate-100">
+              <div className="flex items-center justify-between px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">By area / city</p>
+                <span className="text-[10px] font-medium text-slate-400">{unitRows.length} rows</span>
+              </div>
+              <div className="max-h-[14rem] min-h-[8rem] flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 xl:min-h-0 xl:max-h-none xl:flex-1">
+                <table className="w-full border-collapse text-left text-[12px]">
+                  <thead className="sticky top-0 z-[1] bg-slate-100/95 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm backdrop-blur-sm">
+                    <tr>
+                      <th className="rounded-l-md px-2 py-2">Area</th>
+                      <th className="px-1 py-2">Type</th>
+                      <th className="px-1 py-2 text-right">Voters</th>
+                      <th className="px-1 py-2 text-right">Reg.</th>
+                      <th className="rounded-r-md px-2 py-2 text-right">Wkr</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-800">
+                    {unitRows.map((row) => (
+                      <tr key={row._id} className="hover:bg-primary-50/40">
+                        <td className="max-w-[9rem] truncate px-2 py-2 font-medium" title={row.name}>
+                          <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle ring-1 ring-white shadow-sm" style={{ backgroundColor: AREA_COLORS[row.type] }} />
+                          {row.name}
+                        </td>
+                        <td className="whitespace-nowrap px-1 py-2 text-[10px] font-semibold text-slate-500">
+                          {row.type}
+                        </td>
+                        <td className="px-1 py-2 text-right font-semibold tabular-nums text-primary-800">
+                          {row.voterCount ?? 0}
+                        </td>
+                        <td className="px-1 py-2 text-right tabular-nums text-slate-600">{row.registeredVoters ?? 0}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-violet-700">{row.workerCount ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {unitRows.length === 0 && (
+                  <p className="px-2 py-6 text-center text-xs text-slate-500">No area rows in this scope yet.</p>
+                )}
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
 
