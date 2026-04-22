@@ -35,6 +35,14 @@ export default function ElectionConfigSettings() {
     candidateName: '',
     partyName: '',
     partySymbol: '',
+    constituencyNameHi: '',
+    dashboardBannerImageUrl: '',
+    candidatePhotoUrl: '',
+    partySymbolImageUrl: '',
+    bannerGradientFrom: '',
+    bannerGradientTo: '',
+    dashboardSloganLine1: '',
+    dashboardSloganLine2: '',
     electionDate: '',
     totalRegisteredVoters: 0,
     totalBooths: 0,
@@ -62,6 +70,14 @@ export default function ElectionConfigSettings() {
           candidateName: config.candidateName || '',
           partyName: config.partyName || '',
           partySymbol: config.partySymbol || '',
+          constituencyNameHi: config.constituencyNameHi || '',
+          dashboardBannerImageUrl: config.dashboardBannerImageUrl || '',
+          candidatePhotoUrl: config.candidatePhotoUrl || '',
+          partySymbolImageUrl: config.partySymbolImageUrl || '',
+          bannerGradientFrom: config.bannerGradientFrom || '',
+          bannerGradientTo: config.bannerGradientTo || '',
+          dashboardSloganLine1: config.dashboardSloganLine1 || '',
+          dashboardSloganLine2: config.dashboardSloganLine2 || '',
           electionDate: config.electionDate ? config.electionDate.split('T')[0] : '',
           totalRegisteredVoters: config.totalRegisteredVoters || 0,
           totalBooths: config.totalBooths || 0,
@@ -292,14 +308,143 @@ export default function ElectionConfigSettings() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Party Symbol
+                Party Symbol (text)
               </label>
               <input
                 type="text"
                 value={formData.partySymbol}
                 onChange={e => handleChange('partySymbol', e.target.value)}
                 className="input-field"
-                placeholder="e.g., Lotus, Hand"
+                placeholder="e.g., कमल, Lotus"
+                disabled={!canEdit}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Dashboard hero (home banner) */}
+        <div className="card border border-amber-100 bg-gradient-to-br from-amber-50/80 to-white">
+          <h2 className="text-lg font-semibold text-gray-800 mb-1">Dashboard banner</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Optional: candidate photo, symbol image, slogans, colours, or one full banner image (HTTPS link — e.g. from
+            your CDN / Drive public link). Leave image URLs empty to use text + gradient only.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Full banner background image URL (optional)
+              </label>
+              <input
+                type="url"
+                value={formData.dashboardBannerImageUrl}
+                onChange={(e) => handleChange('dashboardBannerImageUrl', e.target.value)}
+                className="input-field"
+                placeholder="https://…/banner.jpg"
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Candidate photo URL
+              </label>
+              <input
+                type="url"
+                value={formData.candidatePhotoUrl}
+                onChange={(e) => handleChange('candidatePhotoUrl', e.target.value)}
+                className="input-field"
+                placeholder="https://…/candidate.png"
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Party symbol image URL
+              </label>
+              <input
+                type="url"
+                value={formData.partySymbolImageUrl}
+                onChange={(e) => handleChange('partySymbolImageUrl', e.target.value)}
+                className="input-field"
+                placeholder="https://…/symbol.png"
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Banner title (Hindi / large line, optional)
+              </label>
+              <input
+                type="text"
+                value={formData.constituencyNameHi}
+                onChange={(e) => handleChange('constituencyNameHi', e.target.value)}
+                className="input-field"
+                placeholder="e.g. मल्लावां-बिलग्राम — empty uses constituency name"
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Banner gradient — from (hex)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={formData.bannerGradientFrom || '#ea580c'}
+                  onChange={(e) => handleChange('bannerGradientFrom', e.target.value)}
+                  className="h-10 w-14 rounded-lg border border-gray-200 cursor-pointer bg-white shrink-0"
+                  disabled={!canEdit}
+                />
+                <input
+                  type="text"
+                  value={formData.bannerGradientFrom}
+                  onChange={(e) => handleChange('bannerGradientFrom', e.target.value)}
+                  className="input-field flex-1 font-mono text-sm"
+                  placeholder="#ea580c (optional)"
+                  disabled={!canEdit}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Banner gradient — to (hex)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={formData.bannerGradientTo || '#9a3412'}
+                  onChange={(e) => handleChange('bannerGradientTo', e.target.value)}
+                  className="h-10 w-14 rounded-lg border border-gray-200 cursor-pointer bg-white shrink-0"
+                  disabled={!canEdit}
+                />
+                <input
+                  type="text"
+                  value={formData.bannerGradientTo}
+                  onChange={(e) => handleChange('bannerGradientTo', e.target.value)}
+                  className="input-field flex-1 font-mono text-sm"
+                  placeholder="#9a3412 (optional)"
+                  disabled={!canEdit}
+                />
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Slogan line 1 (optional)</label>
+              <input
+                type="text"
+                value={formData.dashboardSloganLine1}
+                onChange={(e) => handleChange('dashboardSloganLine1', e.target.value)}
+                className="input-field"
+                placeholder="e.g. जनता का विश्वास, विकास का संकल्प"
+                disabled={!canEdit}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Slogan line 2 (optional)</label>
+              <input
+                type="text"
+                value={formData.dashboardSloganLine2}
+                onChange={(e) => handleChange('dashboardSloganLine2', e.target.value)}
+                className="input-field"
+                placeholder="e.g. हर घर तक सेवा, हर दिल में भरोसा"
                 disabled={!canEdit}
               />
             </div>

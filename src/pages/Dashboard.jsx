@@ -173,6 +173,25 @@ function FitToMarkers({ areas, hasStateGeo }) {
   return null
 }
 
+/** Only http(s) URLs for img / CSS backgrounds (admin-controlled). */
+function safeHttpUrl(u) {
+  const s = String(u || '').trim()
+  if (!/^https?:\/\//i.test(s)) return ''
+  return s
+}
+
+function constituencyTypeLabelHi(type, number) {
+  const n = number != null && String(number).trim() !== '' ? ` ${String(number).trim()}` : ''
+  const map = {
+    VIDHANSABHA: 'विधानसभा',
+    LOKSABHA: 'लोकसभा',
+    MUNICIPAL: 'नगर निकाय',
+    PANCHAYAT: 'पंचायत',
+    OTHER: 'क्षेत्र',
+  }
+  return (map[type] || 'क्षेत्र') + n
+}
+
 export default function Dashboard() {
   const { role } = useAuthStore()
   const [stats, setStats] = useState(null)
@@ -243,57 +262,133 @@ function ConstituencyHeader({ config, isAdmin }) {
     )
   }
 
+  const bannerImg = safeHttpUrl(config.dashboardBannerImageUrl)
+  const candPhoto = safeHttpUrl(config.candidatePhotoUrl)
+  const symImg = safeHttpUrl(config.partySymbolImageUrl)
+  const gf = String(config.bannerGradientFrom || '').trim()
+  const gt = String(config.bannerGradientTo || '').trim()
+  const from = gf && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(gf) ? gf : '#ea580c'
+  const to = gt && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(gt) ? gt : '#9a3412'
+  const titleMain = (config.constituencyNameHi || '').trim() || config.constituencyName
+  const typeHi = constituencyTypeLabelHi(config.constituencyType, config.constituencyNumber)
+  const line1 = (config.dashboardSloganLine1 || '').trim()
+  const line2 = (config.dashboardSloganLine2 || '').trim()
+
+  const shellStyle = bannerImg
+    ? {
+        backgroundImage: `linear-gradient(105deg, rgba(15,23,42,0.78) 0%, rgba(15,23,42,0.42) 42%, rgba(15,23,42,0.65) 100%), url(${JSON.stringify(bannerImg)})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : {
+        background: `linear-gradient(118deg, ${from} 0%, #f59e0b 48%, ${to} 100%)`,
+      }
+
   return (
-    <div className="card bg-gradient-to-r from-primary-600 to-primary-800 text-white border-0">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
-            <FiMapPin className="w-7 h-7" />
-          </div>
-          <div>
-            <p className="text-primary-200 text-sm font-medium uppercase tracking-wider">
-              {config.constituencyType?.replace('_', ' ')} Constituency
-            </p>
-            <h1 className="text-2xl font-bold">{config.constituencyName}</h1>
-            <p className="text-primary-100 text-sm mt-0.5">
+    <section
+      className="relative overflow-hidden rounded-2xl border border-white/10 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
+      style={shellStyle}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.12]"
+        aria-hidden
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 18% 22%, rgba(255,255,255,0.9) 0%, transparent 42%), radial-gradient(circle at 88% 8%, rgba(255,255,255,0.35) 0%, transparent 35%)',
+        }}
+      />
+      <div className="relative z-10 px-5 py-6 sm:px-8 sm:py-8 text-white">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center">
+          <div className="lg:col-span-5 space-y-3">
+            <p className="text-sm font-medium tracking-wide text-white/90 drop-shadow-sm">{typeHi}</p>
+            <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight text-white drop-shadow-md [text-shadow:0_2px_18px_rgba(0,0,0,0.25)]">
+              {titleMain}
+            </h1>
+            <p className="text-sm sm:text-base text-white/90 drop-shadow">
               {config.district}, {config.state}
-              {config.constituencyNumber ? ` • #${config.constituencyNumber}` : ''}
+              {config.constituencyNumber ? ` · #${config.constituencyNumber}` : ''}
             </p>
+            {(line1 || line2) && (
+              <div className="space-y-1 pt-1 text-sm sm:text-base text-white/95 leading-snug border-t border-white/20 mt-3 pt-3">
+                {line1 ? <p className="drop-shadow-sm">{line1}</p> : null}
+                {line2 ? <p className="drop-shadow-sm">{line2}</p> : null}
+              </div>
+            )}
+          </div>
+
+          <div className="lg:col-span-4 flex flex-col gap-4 rounded-2xl bg-black/20 px-4 py-4 sm:px-5 backdrop-blur-[2px] ring-1 ring-white/15">
+            {config.candidateName ? (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">Candidate</p>
+                <p className="text-lg font-bold leading-snug">{config.candidateName}</p>
+              </div>
+            ) : null}
+            {config.partyName ? (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">Party</p>
+                <p className="text-lg font-bold">{config.partyName}</p>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              {symImg ? (
+                <img
+                  src={symImg}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-xl bg-white/95 object-contain p-1.5 shadow-md ring-2 ring-white/40"
+                />
+              ) : null}
+              {config.partySymbol?.trim() ? (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">चिन्ह / Symbol</p>
+                  <p className="text-base font-semibold">{config.partySymbol.trim()}</p>
+                </div>
+              ) : null}
+            </div>
+            {config.electionDate ? (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">Election date</p>
+                <p className="text-lg font-bold">
+                  {new Date(config.electionDate).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="lg:col-span-3 flex justify-center lg:justify-end">
+            {candPhoto ? (
+              <div className="relative w-full max-w-[220px]">
+                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-white/50 to-white/10 blur-sm" aria-hidden />
+                <img
+                  src={candPhoto}
+                  alt={config.candidateName || 'Candidate'}
+                  className="relative w-full max-h-[min(18rem,42vh)] rounded-3xl object-cover object-top shadow-2xl ring-4 ring-white/35"
+                />
+              </div>
+            ) : (
+              <div className="hidden h-44 w-full max-w-[200px] items-center justify-center rounded-3xl border border-white/20 bg-white/5 text-center text-[11px] text-white/70 px-3 lg:flex">
+                Optional: add candidate photo URL in Settings → Election Config → Dashboard banner
+              </div>
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-4 md:gap-6">
-          {config.candidateName && (
-            <div className="text-right">
-              <p className="text-primary-200 text-xs uppercase">Candidate</p>
-              <p className="font-semibold">{config.candidateName}</p>
-            </div>
-          )}
-          {config.partyName && (
-            <div className="text-right">
-              <p className="text-primary-200 text-xs uppercase">Party</p>
-              <p className="font-semibold">{config.partyName}</p>
-            </div>
-          )}
-          {config.electionDate && (
-            <div className="text-right">
-              <p className="text-primary-200 text-xs uppercase">Election Date</p>
-              <p className="font-semibold">
-                {new Date(config.electionDate).toLocaleDateString('en-IN', {
-                  day: 'numeric', month: 'short', year: 'numeric'
-                })}
-              </p>
-            </div>
-          )}
+
+        <div
+          className="mt-6 flex border-t border-white/20 pt-4 text-xs text-white/85"
+          title="Election configuration"
+        >
         </div>
-        <p className="text-xs text-primary-100/85 mt-4 pt-3 border-t border-white/15 flex items-start gap-2 max-w-3xl">
-          <FiInfo className="w-4 h-4 shrink-0 mt-0.5 opacity-90" />
-          <span>
-            Candidate name, party, election date and comparison chart rows are loaded from{' '}
-            <strong>Settings → Election Configuration</strong> (database). Update there to change this banner — nothing here is hard-coded test data.
-          </span>
-        </p>
       </div>
-    </div>
+
+      <div className="relative z-10 flex h-2 w-full" aria-hidden>
+        <div className="flex-[1.15] bg-[#FF9933]" />
+        <div className="flex-1 bg-white" />
+        <div className="flex-[1.15] bg-[#138808]" />
+      </div>
+    </section>
   )
 }
 

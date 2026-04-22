@@ -300,17 +300,28 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
   // Filter parent areas based on selected type
   const getParentAreas = () => {
     const typeHierarchy = {
-      'STATE': [],
-      'DISTRICT': ['STATE'],
-      'TEHSIL': ['DISTRICT'],
-      'BLOCK': ['TEHSIL'],
-      'VILLAGE': ['BLOCK'],
-      'WARD': ['BLOCK'],
-      'BOOTH': ['VILLAGE', 'WARD']
+      STATE: [],
+      DISTRICT: ['STATE'],
+      TEHSIL: ['DISTRICT'],
+      /** Block: under tehsil when used; otherwise directly under district (UP-style विकास खंड). */
+      BLOCK: ['TEHSIL', 'DISTRICT'],
+      VILLAGE: ['BLOCK'],
+      WARD: ['BLOCK'],
+      BOOTH: ['VILLAGE', 'WARD'],
     }
 
     const allowedParentTypes = typeHierarchy[formData.type] || []
-    return existingAreas.filter(area => allowedParentTypes.includes(area.type))
+    return existingAreas.filter((area) => allowedParentTypes.includes(area.type))
+  }
+
+  const parentHintForEmpty = () => {
+    const t = formData.type
+    if (t === 'DISTRICT') return 'STATE'
+    if (t === 'TEHSIL') return 'DISTRICT'
+    if (t === 'BLOCK') return 'TEHSIL or DISTRICT (ब्लॉक सीधे जिले के नीचे भी)'
+    if (t === 'VILLAGE' || t === 'WARD') return 'BLOCK'
+    if (t === 'BOOTH') return 'VILLAGE या WARD'
+    return 'parent'
   }
 
   const handleSubmit = async (e) => {
@@ -399,7 +410,8 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Hierarchy: STATE → DISTRICT → BLOCK → VILLAGE/WARD → BOOTH
+                Hierarchy: STATE → DISTRICT → (optional TEHSIL) → BLOCK → VILLAGE/WARD → BOOTH. जहाँ तहसील नहीं,
+                ब्लॉक सीधे जिले के अंतर्गत बनाएँ।
               </p>
             </div>
 
@@ -424,13 +436,8 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
                 ))}
               </select>
               {formData.type !== 'STATE' && getParentAreas().length === 0 && (
-                <p className="text-xs text-orange-600 mt-1 bg-orange-50 p-2 rounded">
-                  ⚠️ कोई parent area नहीं मिला! पहले {
-                    formData.type === 'DISTRICT' ? 'STATE' : 
-                    formData.type === 'BLOCK' ? 'DISTRICT' : 
-                    formData.type === 'VILLAGE' || formData.type === 'WARD' ? 'BLOCK' : 
-                    'VILLAGE या WARD'
-                  } बनाएं।
+                <p className="mt-1 rounded bg-orange-50 p-2 text-xs text-orange-600">
+                  ⚠️ कोई parent area नहीं मिला! पहले <strong>{parentHintForEmpty()}</strong> बनाएं।
                 </p>
               )}
             </div>
@@ -527,7 +534,8 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
               <ul className="text-xs text-blue-800 space-y-1">
                 <li>• <strong>STATE:</strong> Top level (e.g., Uttar Pradesh)</li>
                 <li>• <strong>DISTRICT:</strong> Under State (e.g., Lucknow)</li>
-                <li>• <strong>BLOCK:</strong> Under District (e.g., Sadar)</li>
+                <li>• <strong>TEHSIL:</strong> Under District (optional — जहाँ लागू हो)</li>
+                <li>• <strong>BLOCK:</strong> Under Tehsil, or directly under District if no tehsil</li>
                 <li>• <strong>VILLAGE:</strong> Rural area under Block</li>
                 <li>• <strong>WARD:</strong> Urban area under Block</li>
                 <li>• <strong>BOOTH:</strong> Polling booth under Village/Ward</li>
@@ -589,18 +597,18 @@ function EditAreaModal({ area, onClose, onSuccess, existingAreas }) {
   // Filter parent areas based on selected type
   const getParentAreas = () => {
     const typeHierarchy = {
-      'STATE': [],
-      'DISTRICT': ['STATE'],
-      'TEHSIL': ['DISTRICT'],
-      'BLOCK': ['TEHSIL'],
-      'VILLAGE': ['BLOCK'],
-      'WARD': ['BLOCK'],
-      'BOOTH': ['VILLAGE', 'WARD']
+      STATE: [],
+      DISTRICT: ['STATE'],
+      TEHSIL: ['DISTRICT'],
+      BLOCK: ['TEHSIL', 'DISTRICT'],
+      VILLAGE: ['BLOCK'],
+      WARD: ['BLOCK'],
+      BOOTH: ['VILLAGE', 'WARD'],
     }
 
     const allowedParentTypes = typeHierarchy[formData.type] || []
-    return existingAreas.filter(a => 
-      allowedParentTypes.includes(a.type) && a._id !== area._id
+    return existingAreas.filter(
+      (a) => allowedParentTypes.includes(a.type) && a._id !== area._id
     )
   }
 

@@ -69,6 +69,8 @@ export default function Voters() {
     }
   }
   
+  const FILTER_DISTRICT_BLOCKS = '__DISTRICT_BLOCKS__'
+
   const handleFilterDistrictChange = async (districtId) => {
     setSelectedFilterDistrict(districtId)
     setSelectedFilterTehsil('')
@@ -76,34 +78,54 @@ export default function Voters() {
     setFilters({ ...filters, areaId: districtId })
     setFilterTehsils([])
     setFilterBlocks([])
-    
-    if (districtId) {
-      try {
-        const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 100 } })
-        if (data.success) {
-          setFilterTehsils(data.data || [])
+
+    if (!districtId) return
+    try {
+      const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 100 } })
+      const tehsils = data.success ? data.data || [] : []
+      setFilterTehsils(tehsils)
+      if (tehsils.length === 0) {
+        const { data: b } = await api.get('/areas', { params: { type: 'BLOCK', parentId: districtId, limit: 100 } })
+        if (b.success) {
+          setFilterBlocks(b.data || [])
         }
-      } catch (error) {
-        console.error('Failed to fetch tehsils:', error)
       }
+    } catch (error) {
+      console.error('Failed to fetch tehsils:', error)
     }
   }
-  
-  const handleFilterTehsilChange = async (tehsilId) => {
-    setSelectedFilterTehsil(tehsilId)
+
+  const handleFilterTehsilChange = async (value) => {
     setSelectedFilterBlock('')
-    setFilters({ ...filters, areaId: tehsilId })
     setFilterBlocks([])
-    
-    if (tehsilId) {
-      try {
-        const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: tehsilId, limit: 100 } })
-        if (data.success) {
-          setFilterBlocks(data.data || [])
+
+    if (value === '' || value === FILTER_DISTRICT_BLOCKS) {
+      setSelectedFilterTehsil(value === FILTER_DISTRICT_BLOCKS ? FILTER_DISTRICT_BLOCKS : '')
+      setFilters({ ...filters, areaId: selectedFilterDistrict })
+      if (selectedFilterDistrict) {
+        try {
+          const { data } = await api.get('/areas', {
+            params: { type: 'BLOCK', parentId: selectedFilterDistrict, limit: 100 },
+          })
+          if (data.success) {
+            setFilterBlocks(data.data || [])
+          }
+        } catch (error) {
+          console.error('Failed to fetch blocks:', error)
         }
-      } catch (error) {
-        console.error('Failed to fetch blocks:', error)
       }
+      return
+    }
+
+    setSelectedFilterTehsil(value)
+    setFilters({ ...filters, areaId: value })
+    try {
+      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: value, limit: 100 } })
+      if (data.success) {
+        setFilterBlocks(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch blocks:', error)
     }
   }
   
@@ -144,6 +166,7 @@ export default function Voters() {
   }
 
   const canCreate = permissions?.voters?.create || role === 'SUPER_ADMIN'
+  const canEdit = permissions?.voters?.edit || role === 'SUPER_ADMIN'
   const canExport = permissions?.voters?.export || role === 'SUPER_ADMIN'
 
   return (
@@ -256,6 +279,9 @@ export default function Voters() {
                 disabled={!selectedFilterDistrict}
               >
                 <option value="">All Tehsils</option>
+                {filterTehsils.length > 0 && (
+                  <option value={FILTER_DISTRICT_BLOCKS}>No tehsil (district blocks)</option>
+                )}
                 {filterTehsils.map(tehsil => (
                   <option key={tehsil._id} value={tehsil._id}>{tehsil.name}</option>
                 ))}
@@ -264,7 +290,7 @@ export default function Voters() {
                 value={selectedFilterBlock}
                 onChange={(e) => handleFilterBlockChange(e.target.value)}
                 className="input-field"
-                disabled={!selectedFilterTehsil}
+                disabled={!selectedFilterDistrict || filterBlocks.length === 0}
               >
                 <option value="">All Blocks</option>
                 {filterBlocks.map(block => (
@@ -329,9 +355,9 @@ export default function Voters() {
                 <tr key={voter._id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">
                     <div>
-                      <p className="font-medium text-gray-800">{voter.name}</p>
-                      {voter.fatherName && (
-                        <p className="text-sm text-gray-500">S/O: {voter.fatherName}</p>
+                      <p className="font-medium text-gray-800">{voter.name || '—'}</p>
+                      {voter.relativeName && (
+                        <p className="text-sm text-gray-500">पिता/पति: {voter.relativeName}</p>
                       )}
                     </div>
                   </td>
@@ -359,12 +385,22 @@ export default function Voters() {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
-                      <Link 
+                      <Link
                         to={`/voters/${voter._id}`}
                         className="text-primary-600 hover:text-primary-700"
+                        title="View"
                       >
                         <FiEye className="w-4 h-4" />
                       </Link>
+                      {canEdit && (
+                        <Link
+                          to={`/voters/${voter._id}?edit=1`}
+                          className="text-slate-600 hover:text-primary-600"
+                          title="Edit"
+                        >
+                          <FiEdit2 className="w-4 h-4" />
+                        </Link>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -539,20 +575,28 @@ function AddVoterModal({ onClose, onSuccess }) {
     }
   }
   
+  const ADD_MODAL_DISTRICT_BLOCKS = '__DISTRICT_BLOCKS__'
+
   const fetchTehsils = async (districtId) => {
     try {
       const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 100 } })
-      if (data.success) {
-        setTehsils(data.data || [])
-      }
+      const list = data.success ? data.data || [] : []
+      setTehsils(list)
+      return list
     } catch (error) {
       console.error('Failed to fetch tehsils:', error)
+      setTehsils([])
+      return []
     }
   }
-  
-  const fetchBlocks = async (tehsilId) => {
+
+  const fetchBlocks = async (parentAreaId) => {
+    if (!parentAreaId) {
+      setBlocks([])
+      return
+    }
     try {
-      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: tehsilId, limit: 100 } })
+      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: parentAreaId, limit: 100 } })
       if (data.success) {
         setBlocks(data.data || [])
       }
@@ -600,7 +644,7 @@ function AddVoterModal({ onClose, onSuccess }) {
     if (stateId) fetchDistricts(stateId)
   }
   
-  const handleDistrictChange = (districtId) => {
+  const handleDistrictChange = async (districtId) => {
     setSelectedDistrict(districtId)
     setSelectedTehsil('')
     setSelectedBlock('')
@@ -610,18 +654,30 @@ function AddVoterModal({ onClose, onSuccess }) {
     setBlocks([])
     setVillages([])
     setBooths([])
-    if (districtId) fetchTehsils(districtId)
+    if (!districtId) return
+    const tehsilList = await fetchTehsils(districtId)
+    if (tehsilList.length === 0) {
+      await fetchBlocks(districtId)
+    }
   }
-  
-  const handleTehsilChange = (tehsilId) => {
-    setSelectedTehsil(tehsilId)
+
+  const handleTehsilChange = (value) => {
     setSelectedBlock('')
     setSelectedVillage('')
     setFormData({ ...formData, areaId: '' })
-    setBlocks([])
     setVillages([])
     setBooths([])
-    if (tehsilId) fetchBlocks(tehsilId)
+    if (value === '' || value === ADD_MODAL_DISTRICT_BLOCKS) {
+      setSelectedTehsil(value === ADD_MODAL_DISTRICT_BLOCKS ? ADD_MODAL_DISTRICT_BLOCKS : '')
+      setBlocks([])
+      if (selectedDistrict) {
+        fetchBlocks(selectedDistrict)
+      }
+      return
+    }
+    setSelectedTehsil(value)
+    setBlocks([])
+    fetchBlocks(value)
   }
   
   const handleBlockChange = (blockId) => {
@@ -801,9 +857,10 @@ function AddVoterModal({ onClose, onSuccess }) {
               <h3 className="text-lg font-semibold text-gray-800 mb-3">
                 Area / Location (Optional)
               </h3>
-              <div className="bg-blue-50 p-3 rounded-lg mb-4">
+              <div className="rounded-lg bg-blue-50 p-3 mb-4">
                 <p className="text-sm text-blue-700">
-                  📍 Select area step by step: State → District → Tehsil → Block → Village/Ward → Booth
+                  📍 State → District → (optional Tehsil) → Block → Village/Ward → Booth. अगर तहसील नहीं, ब्लॉक सीधे
+                  जिले से चुनें।
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -840,7 +897,7 @@ function AddVoterModal({ onClose, onSuccess }) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tehsil (तहसील)
+                    Tehsil (तहसील) — optional
                   </label>
                   <select
                     value={selectedTehsil}
@@ -849,6 +906,9 @@ function AddVoterModal({ onClose, onSuccess }) {
                     disabled={!selectedDistrict}
                   >
                     <option value="">Select Tehsil</option>
+                    {tehsils.length > 0 && (
+                      <option value={ADD_MODAL_DISTRICT_BLOCKS}>No tehsil — blocks under district</option>
+                    )}
                     {tehsils.map(tehsil => (
                       <option key={tehsil._id} value={tehsil._id}>{tehsil.name}</option>
                     ))}
@@ -862,7 +922,7 @@ function AddVoterModal({ onClose, onSuccess }) {
                     value={selectedBlock}
                     onChange={(e) => handleBlockChange(e.target.value)}
                     className="input-field"
-                    disabled={!selectedTehsil}
+                    disabled={!selectedDistrict || blocks.length === 0}
                   >
                     <option value="">Select Block</option>
                     {blocks.map(block => (
