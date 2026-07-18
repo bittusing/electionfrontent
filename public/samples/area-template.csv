@@ -1,0 +1,8 @@
+type,name,code,population,totalVoters,latitude,longitude,state,district,tehsil,block,villageWard,villageWardType
+STATE,Sample State (replace with your state),SMP,,,,,,,,,,
+DISTRICT,Sample District,SMP-D1,,,,,Sample State (replace with your state),,,,,
+TEHSIL,Sample Tehsil,,,,,,Sample State (replace with your state),Sample District,,,,
+BLOCK,Sample Block,,,,,,Sample State (replace with your state),Sample District,Sample Tehsil,,,
+VILLAGE,Sample Village,,10000,6500,27.1234,80.1234,Sample State (replace with your state),Sample District,Sample Tehsil,Sample Block,,
+BOOTH,Sample Booth 1,B-101,,,27.1240,80.1240,Sample State (replace with your state),Sample District,Sample Tehsil,Sample Block,Sample Village,VILLAGE
+BOOTH,Sample Booth 2,B-102,,,27.1255,80.1255,Sample State (replace with your state),Sample District,Sample Tehsil,Sample Block,Sample Village,VILLAGE

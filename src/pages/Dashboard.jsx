@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { motion, animate } from 'framer-motion'
 import {
   FiUsers, FiMap, FiCheckSquare, FiCalendar,
   FiUserCheck, FiMapPin, FiNavigation, FiHeart, FiInfo,
@@ -222,8 +223,14 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="space-y-6">
+        <div className="skeleton h-40 rounded-2xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skeleton h-28 rounded-2xl" style={{ animationDelay: `${i * 0.08}s` }} />
+          ))}
+        </div>
+        <div className="skeleton h-72 rounded-2xl" />
       </div>
     )
   }
@@ -541,15 +548,38 @@ function PastElectionBarChart({ stats, electionConfig }) {
   )
 }
 
+const statGridVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+}
+
+const statItemVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.96 },
+  show: { opacity: 1, y: 0, scale: 1 },
+}
+
 function AdminDashboard({ stats, areas, electionConfig }) {
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={FiUsers} title="Total Voters" value={stats?.totalVoters || 0} color="blue" />
-        <StatCard icon={FiMap} title="Areas" value={stats?.totalAreas || 0} color="green" />
-        <StatCard icon={FiUserCheck} title="Active Workers" value={stats?.activeWorkers || 0} color="purple" />
-        <StatCard icon={FiCheckSquare} title="Tasks Completed" value={stats?.completedTasks || 0} color="orange" />
-      </div>
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        variants={statGridVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.div variants={statItemVariants}>
+          <StatCard icon={FiUsers} title="Total Voters" value={stats?.totalVoters || 0} color="blue" />
+        </motion.div>
+        <motion.div variants={statItemVariants}>
+          <StatCard icon={FiMap} title="Areas" value={stats?.totalAreas || 0} color="green" />
+        </motion.div>
+        <motion.div variants={statItemVariants}>
+          <StatCard icon={FiUserCheck} title="Active Workers" value={stats?.activeWorkers || 0} color="purple" />
+        </motion.div>
+        <motion.div variants={statItemVariants}>
+          <StatCard icon={FiCheckSquare} title="Tasks Completed" value={stats?.completedTasks || 0} color="orange" />
+        </motion.div>
+      </motion.div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <SupporterCampaignCard snapshot={stats?.supporterSnapshot} />
@@ -1176,6 +1206,27 @@ function WorkerDashboard({ stats, electionConfig }) {
   )
 }
 
+function AnimatedNumber({ value }) {
+  const ref = useRef(null)
+  const prev = useRef(0)
+
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    const controls = animate(prev.current, value, {
+      duration: 0.9,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate(v) {
+        node.textContent = Math.round(v).toLocaleString('en-IN')
+      },
+    })
+    prev.current = value
+    return () => controls.stop()
+  }, [value])
+
+  return <span ref={ref}>0</span>
+}
+
 function StatCard({ icon: Icon, title, value, color, link }) {
   const colors = {
     blue: 'bg-blue-100 text-blue-600',
@@ -1184,18 +1235,32 @@ function StatCard({ icon: Icon, title, value, color, link }) {
     orange: 'bg-orange-100 text-orange-600',
   }
 
+  const isNumeric = typeof value === 'number'
+
   const content = (
     <>
-      <div className={`w-12 h-12 rounded-lg ${colors[color]} flex items-center justify-center`}>
+      <motion.div
+        className={`w-12 h-12 rounded-lg ${colors[color]} flex items-center justify-center`}
+        whileHover={{ rotate: [0, -8, 8, -4, 0] }}
+        transition={{ duration: 0.5 }}
+      >
         <Icon className="w-6 h-6" />
-      </div>
+      </motion.div>
       <div className="mt-4">
         <p className="text-sm text-gray-600">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+        <p className="text-2xl font-bold text-gray-800 mt-1 tabular-nums">
+          {isNumeric ? <AnimatedNumber value={value} /> : value}
+        </p>
       </div>
     </>
   )
 
-  if (link) return <a href={link} className="stat-card block">{content}</a>
-  return <div className="stat-card">{content}</div>
+  const cardProps = {
+    className: 'stat-card block',
+    whileHover: { y: -4 },
+    transition: { type: 'spring', stiffness: 350, damping: 22 },
+  }
+
+  if (link) return <motion.a href={link} {...cardProps}>{content}</motion.a>
+  return <motion.div {...cardProps}>{content}</motion.div>
 }

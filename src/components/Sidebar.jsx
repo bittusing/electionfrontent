@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import {
   FiHome, FiMap, FiUsers, FiCheckSquare, FiCalendar,
   FiFileText, FiUserCheck, FiBarChart2, FiSettings, FiX, FiTarget, FiMessageSquare
@@ -20,6 +21,52 @@ const MENU_ITEMS = [
   { name: 'Settings', icon: FiSettings, path: '/settings', alwaysShow: true },
 ]
 
+function NavItem({ item, pillId, onClick }) {
+  return (
+    <NavLink
+      to={item.path}
+      end={item.path === '/'}
+      onClick={onClick}
+      className={({ isActive }) =>
+        `relative flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
+          isActive ? 'text-white' : 'text-gray-700 hover:bg-primary-50/80 hover:text-primary-800'
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <motion.span
+              layoutId={pillId}
+              className="absolute inset-0 rounded-xl bg-primary-600 shadow-md shadow-primary-600/25"
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            />
+          )}
+          <item.icon className="relative z-10 w-5 h-5 mr-3" />
+          <span className="relative z-10">{item.name}</span>
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+function NavList({ items, pillId, onNavigate }) {
+  return (
+    <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      {items.map((item, i) => (
+        <motion.div
+          key={item.path}
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.35, delay: 0.03 * i, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <NavItem item={item} pillId={pillId} onClick={onNavigate} />
+        </motion.div>
+      ))}
+    </nav>
+  )
+}
+
 export default function Sidebar({ open, setOpen }) {
   const { permissions, role, user } = useAuthStore()
 
@@ -37,7 +84,15 @@ export default function Sidebar({ open, setOpen }) {
       <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white/95 backdrop-blur-md border-r border-gray-200/90 shadow-soft border-l-4 border-l-primary-500">
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center h-16 px-5 border-b border-gray-100 bg-gradient-to-r from-primary-50/80 to-white">
-            <span className="text-2xl mr-2" aria-hidden>🗳️</span>
+            <motion.span
+              className="text-2xl mr-2"
+              aria-hidden
+              initial={{ scale: 0, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.1 }}
+            >
+              🗳️
+            </motion.span>
             <span className="text-lg font-bold text-gray-900 tracking-tight">Election CRM</span>
           </div>
 
@@ -55,25 +110,7 @@ export default function Sidebar({ open, setOpen }) {
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-            {visibleMenuItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) =>
-                  `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
-                      : 'text-gray-700 hover:bg-primary-50/80 hover:text-primary-800'
-                  }`
-                }
-              >
-                <item.icon className="w-5 h-5 mr-3" />
-                {item.name}
-              </NavLink>
-            ))}
-          </nav>
+          <NavList items={visibleMenuItems} pillId="desktop-active-pill" />
         </div>
       </aside>
 
@@ -108,26 +145,7 @@ export default function Sidebar({ open, setOpen }) {
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-            {visibleMenuItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
-                      : 'text-gray-700 hover:bg-primary-50/80 hover:text-primary-800'
-                  }`
-                }
-              >
-                <item.icon className="w-5 h-5 mr-3" />
-                {item.name}
-              </NavLink>
-            ))}
-          </nav>
+          <NavList items={visibleMenuItems} pillId="mobile-active-pill" onNavigate={() => setOpen(false)} />
         </div>
       </aside>
     </>

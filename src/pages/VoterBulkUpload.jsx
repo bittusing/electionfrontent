@@ -202,7 +202,8 @@ export default function VoterBulkUpload() {
 
     try {
       const { data } = await api.post(importUrl, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: isPdf ? 300000 : 120000,
       })
       if (data.success) {
         setUploadResult(data.data)
@@ -270,8 +271,9 @@ export default function VoterBulkUpload() {
           </div>
           <p className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/90 px-3 py-2 text-xs text-emerald-950">
             <strong>PDF upload:</strong> अब <strong>.pdf</strong> भी चुन सकते हैं — सर्वर PDF से <em>selectable text</em> निकालकर EPIC
-            (10 अक्षर) ढूँढता है और नाम/रिश्तेदार/मकान/आयु/लिंग best-effort भरता है। <strong>स्कैन वाली</strong> PDF (जिसमें टेक्स्ट
-            कॉपी नहीं होता) पर यह काम नहीं करेगा — उसके लिए OCR या Excel ज़रूरी। बड़ी फ़ाइल (~35 MB तक)।
+            (3 अंग्रेज़ी अक्षर + 7 कोड, जैसे UPQ1234567) ढूँढता है और नाम/रिश्तेदार/मकान/आयु/लिंग best-effort भरता है। अगर एरर आए
+            “टेक्स्ट मिला पर EPIC नहीं” तो PDF में EPIC पर कर्सर रखकर <strong>कॉपी</strong> करके देखें — न चले = स्कैन/इमेज PDF; तब{' '}
+            <strong>Excel/CSV</strong> या OCR। बड़ी फ़ाइल ~80 MB; भारी PDF में कुछ मिनट लग सकते हैं।
           </p>
         </div>
       </div>
@@ -478,9 +480,12 @@ export default function VoterBulkUpload() {
               </div>
               {uploadResult.pdfMeta && (
                 <p className="mt-2 text-xs text-green-900/90">
-                  PDF: {uploadResult.pdfMeta.pages} page(s), {uploadResult.pdfMeta.charCount} chars extracted,{' '}
-                  {uploadResult.pdfMeta.extractedEpics} EPIC match(es) → {uploadResult.pdfMeta.uniqueRows} unique rows
-                  parsed.
+                  PDF: {uploadResult.pdfMeta.pages} page(s)
+                  {uploadResult.pdfMeta.pagesRendered != null
+                    ? ` (${uploadResult.pdfMeta.pagesRendered} rendered)`
+                    : ''}
+                  , {uploadResult.pdfMeta.charCount} chars, layout: {uploadResult.pdfMeta.textLayout || '—'},{' '}
+                  {uploadResult.pdfMeta.extractedEpics} EPIC match(es) → {uploadResult.pdfMeta.uniqueRows} unique rows.
                 </p>
               )}
             </div>

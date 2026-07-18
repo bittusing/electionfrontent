@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FiPlus, FiSearch, FiDownload, FiUpload, FiEye, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiDownload, FiUpload, FiEye, FiEdit2, FiTrash2, FiX, FiAlertTriangle } from 'react-icons/fi'
+import { AnimatePresence, motion } from 'framer-motion'
 import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
+import PaginationBar from '../components/PaginationBar'
 
 export default function Voters() {
   const { permissions, role } = useAuthStore()
@@ -20,7 +22,10 @@ export default function Voters() {
     areaId: ''
   })
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 })
-  
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+
   // Area filters
   const [areas, setAreas] = useState([])
   const [states, setStates] = useState([])
@@ -135,22 +140,23 @@ export default function Voters() {
   }
 
   useEffect(() => {
-    fetchVoters()
-  }, [pagination.page])
+    fetchVoters(pagination.page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.limit])
 
-  const fetchVoters = async () => {
+  const fetchVoters = async (page = pagination.page) => {
     try {
       setLoading(true)
       const params = {
-        page: pagination.page,
+        page,
         limit: pagination.limit,
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v))
       }
-      
+
       const { data } = await api.get('/voters', { params })
       if (data.success) {
         setVoters(data.data || [])
-        setPagination(prev => ({ ...prev, total: data.pagination?.total || 0 }))
+        setPagination(prev => ({ ...prev, page, total: data.pagination?.total ?? prev.total }))
       }
     } catch (error) {
       console.error('Fetch voters error:', error)
@@ -161,13 +167,76 @@ export default function Voters() {
   }
 
   const handleSearch = () => {
-    setPagination(prev => ({ ...prev, page: 1 }))
-    fetchVoters()
+    setSelectedIds(new Set())
+    if (pagination.page === 1) {
+      fetchVoters(1)
+    } else {
+      setPagination(prev => ({ ...prev, page: 1 }))
+    }
+  }
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page === pagination.page) return
+    setPagination(prev => ({ ...prev, page }))
+  }
+
+  const handleLimitChange = (limit) => {
+    setSelectedIds(new Set())
+    setPagination(prev => ({ ...prev, limit, page: 1 }))
   }
 
   const canCreate = permissions?.voters?.create || role === 'SUPER_ADMIN'
   const canEdit = permissions?.voters?.edit || role === 'SUPER_ADMIN'
   const canExport = permissions?.voters?.export || role === 'SUPER_ADMIN'
+  const canDelete = permissions?.voters?.delete || role === 'SUPER_ADMIN'
+
+  const allSelectedOnPage = voters.length > 0 && voters.every(v => selectedIds.has(v._id))
+  const someSelectedOnPage = voters.some(v => selectedIds.has(v._id))
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allSelectedOnPage) {
+        voters.forEach(v => next.delete(v._id))
+      } else {
+        voters.forEach(v => next.add(v._id))
+      }
+      return next
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const { data } = await api.delete('/voters/bulk', { data: { ids } })
+      if (data.success) {
+        toast.success(data.message || `${data.data?.deletedCount ?? ids.length} voter(s) deleted`)
+        setSelectedIds(new Set())
+        setShowBulkDeleteConfirm(false)
+        const remainingOnPage = voters.length - ids.filter(id => voters.some(v => v._id === id)).length
+        const targetPage = remainingOnPage === 0 && pagination.page > 1 ? pagination.page - 1 : pagination.page
+        if (targetPage !== pagination.page) {
+          setPagination(prev => ({ ...prev, page: targetPage }))
+        } else {
+          fetchVoters(targetPage)
+        }
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete voters')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -319,6 +388,37 @@ export default function Voters() {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      <AnimatePresence>
+        {canDelete && selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/90 px-4 py-3">
+              <p className="text-sm font-medium text-primary-900">
+                {selectedIds.size} voter{selectedIds.size === 1 ? '' : 's'} selected
+              </p>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setSelectedIds(new Set())} className="btn-secondary text-sm">
+                  Clear selection
+                </button>
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="btn-danger text-sm"
+                >
+                  <FiTrash2 className="w-4 h-4 mr-2" />
+                  Delete selected
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Voters Table */}
       {loading ? (
         <div className="text-center py-12">
@@ -328,7 +428,7 @@ export default function Voters() {
         <div className="card text-center py-12">
           <p className="text-gray-500">No voters found</p>
           {canCreate && (
-            <button 
+            <button
               onClick={() => setShowAddModal(true)}
               className="btn-primary mt-4"
             >
@@ -341,6 +441,18 @@ export default function Voters() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
+                {canDelete && (
+                  <th className="text-left py-3 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded accent-primary-600 cursor-pointer"
+                      checked={allSelectedOnPage}
+                      ref={(el) => el && (el.indeterminate = !allSelectedOnPage && someSelectedOnPage)}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="Select all voters on this page"
+                    />
+                  </th>
+                )}
                 <th className="text-left py-3 px-4">Name</th>
                 <th className="text-left py-3 px-4">Phone</th>
                 <th className="text-left py-3 px-4">Age</th>
@@ -352,7 +464,21 @@ export default function Voters() {
             </thead>
             <tbody>
               {voters.map((voter) => (
-                <tr key={voter._id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr
+                  key={voter._id}
+                  className={`border-b border-gray-100 hover:bg-gray-50 ${selectedIds.has(voter._id) ? 'bg-primary-50/60' : ''}`}
+                >
+                  {canDelete && (
+                    <td className="py-3 px-4">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded accent-primary-600 cursor-pointer"
+                        checked={selectedIds.has(voter._id)}
+                        onChange={() => toggleSelectOne(voter._id)}
+                        aria-label={`Select ${voter.name || 'voter'}`}
+                      />
+                    </td>
+                  )}
                   <td className="py-3 px-4">
                     <div>
                       <p className="font-medium text-gray-800">{voter.name || '—'}</p>
@@ -411,26 +537,13 @@ export default function Voters() {
       )}
 
       {/* Pagination */}
-      {pagination.total > pagination.limit && (
-        <div className="flex justify-center gap-2">
-          <button
-            onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-            disabled={pagination.page === 1}
-            className="btn-secondary"
-          >
-            Previous
-          </button>
-          <span className="px-4 py-2">
-            Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}
-          </span>
-          <button
-            onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-            disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
-            className="btn-secondary"
-          >
-            Next
-          </button>
-        </div>
+      {pagination.total > 0 && (
+        <PaginationBar
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          onLimitChange={handleLimitChange}
+          itemLabel="voters"
+        />
       )}
 
       {/* Add Voter Modal */}
@@ -443,10 +556,51 @@ export default function Voters() {
           }}
         />
       )}
+
+      {/* Bulk Delete Confirm Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white rounded-xl max-w-md w-full p-6"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <FiAlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete {selectedIds.size} voter{selectedIds.size === 1 ? '' : 's'}?</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  This permanently removes the selected voter{selectedIds.size === 1 ? '' : 's'} from the database. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-6">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                disabled={bulkDeleting}
+                className="btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="btn-danger flex-1"
+              >
+                {bulkDeleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
-
 
 // Add Voter Modal Component
 function AddVoterModal({ onClose, onSuccess }) {
