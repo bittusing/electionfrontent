@@ -35,7 +35,6 @@ const INDIA_GEOJSON_URL =
 const AREA_COLORS = {
   STATE: '#1e40af',
   DISTRICT: '#2563eb',
-  TEHSIL: '#3b82f6',
   BLOCK: '#60a5fa',
   VILLAGE: '#16a34a',
   WARD: '#6366f1',
@@ -53,12 +52,12 @@ function normalisePlaceName(s) {
     .trim()
 }
 
-/** Match Settings → District to a DISTRICT/TEHSIL area (uses saved coordinates when present). */
+/** Match Settings → District to a DISTRICT area (uses saved coordinates when present). */
 function findDistrictAreaRecord(areas, districtName) {
   if (!districtName?.trim() || !Array.isArray(areas)) return null
   const d = normalisePlaceName(districtName)
   if (!d) return null
-  const tier = areas.filter((a) => a?.type === 'DISTRICT' || a?.type === 'TEHSIL')
+  const tier = areas.filter((a) => a?.type === 'DISTRICT')
   const exact = tier.find((a) => normalisePlaceName(a.name) === d)
   if (exact) return exact
   return (
@@ -107,7 +106,7 @@ const STATE_CENTERS = {
 
 function createMarkerIcon(type) {
   const color = AREA_COLORS[type] || '#64748b'
-  const sizes = { STATE: 18, DISTRICT: 14, TEHSIL: 12, BLOCK: 11, WARD: 10, VILLAGE: 10, BOOTH: 9 }
+  const sizes = { STATE: 18, DISTRICT: 14, BLOCK: 11, WARD: 10, VILLAGE: 10, BOOTH: 9 }
   const size = sizes[type] || 9
 
   return L.divIcon({
@@ -747,7 +746,7 @@ function ConstituencyMap({ areas, electionConfig, dashboardStats }) {
     if (!groupedByType[area.type]) groupedByType[area.type] = []
     groupedByType[area.type].push(area)
   })
-  const typeOrder = ['STATE', 'DISTRICT', 'TEHSIL', 'BLOCK', 'WARD', 'VILLAGE', 'BOOTH']
+  const typeOrder = ['STATE', 'DISTRICT', 'BLOCK', 'WARD', 'VILLAGE', 'BOOTH']
   const sortedTypes = typeOrder.filter(t => groupedByType[t])
 
   const maskGeoJson = useMemo(() => {

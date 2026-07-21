@@ -12,14 +12,12 @@ export default function VoterBulkUpload() {
   // Area dropdowns for default area selection
   const [states, setStates] = useState([])
   const [districts, setDistricts] = useState([])
-  const [tehsils, setTehsils] = useState([])
   const [blocks, setBlocks] = useState([])
   const [villages, setVillages] = useState([])
   const [booths, setBooths] = useState([])
-  
+
   const [selectedState, setSelectedState] = useState('')
   const [selectedDistrict, setSelectedDistrict] = useState('')
-  const [selectedTehsil, setSelectedTehsil] = useState('')
   const [selectedBlock, setSelectedBlock] = useState('')
   const [selectedVillage, setSelectedVillage] = useState('')
   const [defaultAreaId, setDefaultAreaId] = useState('')
@@ -50,20 +48,6 @@ export default function VoterBulkUpload() {
     }
   }
 
-  const fetchTehsils = async (districtId) => {
-    try {
-      const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 100 } })
-      const list = data.success ? data.data || [] : []
-      setTehsils(list)
-      return list
-    } catch (error) {
-      console.error('Failed to fetch tehsils:', error)
-      setTehsils([])
-      return []
-    }
-  }
-
-  /** parentId = tehsil or district (blocks may sit directly under district when no tehsil). */
   const fetchBlocks = async (parentAreaId) => {
     if (!parentAreaId) {
       setBlocks([])
@@ -105,12 +89,10 @@ export default function VoterBulkUpload() {
   const handleStateChange = (stateId) => {
     setSelectedState(stateId)
     setSelectedDistrict('')
-    setSelectedTehsil('')
     setSelectedBlock('')
     setSelectedVillage('')
     setDefaultAreaId('')
     setDistricts([])
-    setTehsils([])
     setBlocks([])
     setVillages([])
     setBooths([])
@@ -119,41 +101,14 @@ export default function VoterBulkUpload() {
 
   const handleDistrictChange = async (districtId) => {
     setSelectedDistrict(districtId)
-    setSelectedTehsil('')
     setSelectedBlock('')
     setSelectedVillage('')
     setDefaultAreaId('')
-    setTehsils([])
     setBlocks([])
     setVillages([])
     setBooths([])
     if (!districtId) return
-    const tehsilList = await fetchTehsils(districtId)
-    if (tehsilList.length === 0) {
-      await fetchBlocks(districtId)
-    }
-  }
-
-  /** User chose “no tehsil” while tehsils exist — load blocks directly under district. */
-  const DISTRICT_BLOCKS = '__DISTRICT_BLOCKS__'
-
-  const handleTehsilChange = (value) => {
-    setSelectedBlock('')
-    setSelectedVillage('')
-    setDefaultAreaId('')
-    setVillages([])
-    setBooths([])
-    if (value === '' || value === DISTRICT_BLOCKS) {
-      setSelectedTehsil(value === DISTRICT_BLOCKS ? DISTRICT_BLOCKS : '')
-      setBlocks([])
-      if (selectedDistrict) {
-        fetchBlocks(selectedDistrict)
-      }
-      return
-    }
-    setSelectedTehsil(value)
-    setBlocks([])
-    fetchBlocks(value)
+    await fetchBlocks(districtId)
   }
 
   const handleBlockChange = (blockId) => {
@@ -239,7 +194,7 @@ export default function VoterBulkUpload() {
       <div className="card border border-primary-100 bg-gradient-to-br from-primary-50/90 to-white">
         <h3 className="font-semibold text-primary-900 mb-2">निर्देश · Bulk import (Panchayat / नामावली style)</h3>
         <ol className="list-decimal list-inside space-y-2 text-sm text-primary-950/90">
-          <li>State → District → Tehsil → Block → Village/Gram Panchayat → (optional) Booth चुनें — यही <strong>default areaId</strong> बनेगा।</li>
+          <li>State → District → Block → Village/Gram Panchayat → (optional) Booth चुनें — यही <strong>default areaId</strong> बनेगा।</li>
           <li>Excel (.xlsx) या CSV में नीचे वाले कॉलम भरें (हिंदी या English हेडर दोनों चलेंगे)।</li>
           <li>हर पंक्ति में कम से कम <strong>नाम</strong> या <strong>EPIC/SVN</strong> होना चाहिए।</li>
           <li>फोन, कास्ट, समर्थन स्तर आदि बूथ सदस्य बाद में Voters में अपडेट कर सकते हैं।</li>
@@ -256,10 +211,10 @@ export default function VoterBulkUpload() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <tr><td className="py-1 font-medium">Serial</td><td>rollSerialNumber, serial, S.No</td><td>क्र०सं०, क्रम संख्या</td></tr>
+                <tr><td className="py-1 font-medium">Serial</td><td>rollSerialNumber, serial, S.No, Sr. No.</td><td>क्र०सं०, क्रम संख्या</td></tr>
                 <tr><td className="py-1 font-medium">House no.</td><td>houseNumber, house_no</td><td>मकान नं, मकान नं०</td></tr>
                 <tr><td className="py-1 font-medium">Name</td><td>name</td><td>नाम, निर्वाचक का नाम</td></tr>
-                <tr><td className="py-1 font-medium">Father / husband / mother</td><td>relativeName, father_name</td><td>पिता का नाम, पिता/पति/माता का नाम</td></tr>
+                <tr><td className="py-1 font-medium">Father / husband / mother</td><td>relativeName, father_name, Relation Name</td><td>पिता का नाम, पिता/पति/माता का नाम</td></tr>
                 <tr><td className="py-1 font-medium">EPIC / SVN</td><td>voterIdNumber, EPIC</td><td>एस०वी०एन०, SVN</td></tr>
                 <tr><td className="py-1 font-medium">Gender</td><td>MALE / FEMALE</td><td>पु / म (पुरुष / महिला)</td></tr>
                 <tr><td className="py-1 font-medium">Age</td><td>age</td><td>आयु</td></tr>
@@ -343,29 +298,6 @@ export default function VoterBulkUpload() {
                 <option key={district._id} value={district._id}>{district.name}</option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tehsil (तहसील) — ज़रूरी नहीं
-            </label>
-            <select
-              value={selectedTehsil}
-              onChange={(e) => handleTehsilChange(e.target.value)}
-              className="input-field"
-              disabled={!selectedDistrict}
-            >
-              <option value="">Select Tehsil</option>
-              {tehsils.length > 0 && (
-                <option value={DISTRICT_BLOCKS}>बिना तहसील — जिले के सीधे ब्लॉक</option>
-              )}
-              {tehsils.map(tehsil => (
-                <option key={tehsil._id} value={tehsil._id}>{tehsil.name}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-500">
-              अगर जिले में कोई तहसील नहीं है, ब्लॉक सूची अपने आप लोड हो जाएगी।
-            </p>
           </div>
 
           <div>

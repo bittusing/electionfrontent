@@ -32,15 +32,13 @@ export default function Voters() {
   const [selectedFilterState, setSelectedFilterState] = useState('')
   const [filterDistricts, setFilterDistricts] = useState([])
   const [selectedFilterDistrict, setSelectedFilterDistrict] = useState('')
-  const [filterTehsils, setFilterTehsils] = useState([])
-  const [selectedFilterTehsil, setSelectedFilterTehsil] = useState('')
   const [filterBlocks, setFilterBlocks] = useState([])
   const [selectedFilterBlock, setSelectedFilterBlock] = useState('')
 
   useEffect(() => {
     fetchStatesForFilter()
   }, [])
-  
+
   const fetchStatesForFilter = async () => {
     try {
       const { data } = await api.get('/areas', { params: { type: 'STATE', limit: 100 } })
@@ -51,17 +49,15 @@ export default function Voters() {
       console.error('Failed to fetch states:', error)
     }
   }
-  
+
   const handleFilterStateChange = async (stateId) => {
     setSelectedFilterState(stateId)
     setSelectedFilterDistrict('')
-    setSelectedFilterTehsil('')
     setSelectedFilterBlock('')
     setFilters({ ...filters, areaId: stateId })
     setFilterDistricts([])
-    setFilterTehsils([])
     setFilterBlocks([])
-    
+
     if (stateId) {
       try {
         const { data } = await api.get('/areas', { params: { type: 'DISTRICT', parentId: stateId, limit: 100 } })
@@ -73,59 +69,16 @@ export default function Voters() {
       }
     }
   }
-  
-  const FILTER_DISTRICT_BLOCKS = '__DISTRICT_BLOCKS__'
 
   const handleFilterDistrictChange = async (districtId) => {
     setSelectedFilterDistrict(districtId)
-    setSelectedFilterTehsil('')
     setSelectedFilterBlock('')
     setFilters({ ...filters, areaId: districtId })
-    setFilterTehsils([])
     setFilterBlocks([])
 
     if (!districtId) return
     try {
-      const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 100 } })
-      const tehsils = data.success ? data.data || [] : []
-      setFilterTehsils(tehsils)
-      if (tehsils.length === 0) {
-        const { data: b } = await api.get('/areas', { params: { type: 'BLOCK', parentId: districtId, limit: 100 } })
-        if (b.success) {
-          setFilterBlocks(b.data || [])
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch tehsils:', error)
-    }
-  }
-
-  const handleFilterTehsilChange = async (value) => {
-    setSelectedFilterBlock('')
-    setFilterBlocks([])
-
-    if (value === '' || value === FILTER_DISTRICT_BLOCKS) {
-      setSelectedFilterTehsil(value === FILTER_DISTRICT_BLOCKS ? FILTER_DISTRICT_BLOCKS : '')
-      setFilters({ ...filters, areaId: selectedFilterDistrict })
-      if (selectedFilterDistrict) {
-        try {
-          const { data } = await api.get('/areas', {
-            params: { type: 'BLOCK', parentId: selectedFilterDistrict, limit: 100 },
-          })
-          if (data.success) {
-            setFilterBlocks(data.data || [])
-          }
-        } catch (error) {
-          console.error('Failed to fetch blocks:', error)
-        }
-      }
-      return
-    }
-
-    setSelectedFilterTehsil(value)
-    setFilters({ ...filters, areaId: value })
-    try {
-      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: value, limit: 100 } })
+      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: districtId, limit: 100 } })
       if (data.success) {
         setFilterBlocks(data.data || [])
       }
@@ -133,7 +86,7 @@ export default function Voters() {
       console.error('Failed to fetch blocks:', error)
     }
   }
-  
+
   const handleFilterBlockChange = (blockId) => {
     setSelectedFilterBlock(blockId)
     setFilters({ ...filters, areaId: blockId })
@@ -319,7 +272,7 @@ export default function Voters() {
           {/* Area Filters */}
           <div className="border-t pt-4">
             <p className="text-sm font-medium text-gray-700 mb-3">📍 Filter by Area:</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <select
                 value={selectedFilterState}
                 onChange={(e) => handleFilterStateChange(e.target.value)}
@@ -342,20 +295,6 @@ export default function Voters() {
                 ))}
               </select>
               <select
-                value={selectedFilterTehsil}
-                onChange={(e) => handleFilterTehsilChange(e.target.value)}
-                className="input-field"
-                disabled={!selectedFilterDistrict}
-              >
-                <option value="">All Tehsils</option>
-                {filterTehsils.length > 0 && (
-                  <option value={FILTER_DISTRICT_BLOCKS}>No tehsil (district blocks)</option>
-                )}
-                {filterTehsils.map(tehsil => (
-                  <option key={tehsil._id} value={tehsil._id}>{tehsil.name}</option>
-                ))}
-              </select>
-              <select
                 value={selectedFilterBlock}
                 onChange={(e) => handleFilterBlockChange(e.target.value)}
                 className="input-field"
@@ -371,11 +310,9 @@ export default function Voters() {
                   onClick={() => {
                     setSelectedFilterState('')
                     setSelectedFilterDistrict('')
-                    setSelectedFilterTehsil('')
                     setSelectedFilterBlock('')
                     setFilters({ ...filters, areaId: '' })
                     setFilterDistricts([])
-                    setFilterTehsils([])
                     setFilterBlocks([])
                   }}
                   className="btn-secondary"
@@ -692,21 +629,19 @@ function AddVoterModal({ onClose, onSuccess }) {
   // Area cascading dropdowns
   const [states, setStates] = useState([])
   const [districts, setDistricts] = useState([])
-  const [tehsils, setTehsils] = useState([])
   const [blocks, setBlocks] = useState([])
   const [villages, setVillages] = useState([])
   const [booths, setBooths] = useState([])
   const [selectedState, setSelectedState] = useState('')
   const [selectedDistrict, setSelectedDistrict] = useState('')
-  const [selectedTehsil, setSelectedTehsil] = useState('')
   const [selectedBlock, setSelectedBlock] = useState('')
   const [selectedVillage, setSelectedVillage] = useState('')
-  
+
   // Fetch states on mount
   useEffect(() => {
     fetchStates()
   }, [])
-  
+
   const fetchStates = async () => {
     try {
       const { data } = await api.get('/areas', { params: { type: 'STATE', limit: 100 } })
@@ -717,7 +652,7 @@ function AddVoterModal({ onClose, onSuccess }) {
       console.error('Failed to fetch states:', error)
     }
   }
-  
+
   const fetchDistricts = async (stateId) => {
     try {
       const { data } = await api.get('/areas', { params: { type: 'DISTRICT', parentId: stateId, limit: 100 } })
@@ -726,21 +661,6 @@ function AddVoterModal({ onClose, onSuccess }) {
       }
     } catch (error) {
       console.error('Failed to fetch districts:', error)
-    }
-  }
-  
-  const ADD_MODAL_DISTRICT_BLOCKS = '__DISTRICT_BLOCKS__'
-
-  const fetchTehsils = async (districtId) => {
-    try {
-      const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 100 } })
-      const list = data.success ? data.data || [] : []
-      setTehsils(list)
-      return list
-    } catch (error) {
-      console.error('Failed to fetch tehsils:', error)
-      setTehsils([])
-      return []
     }
   }
 
@@ -758,7 +678,7 @@ function AddVoterModal({ onClose, onSuccess }) {
       console.error('Failed to fetch blocks:', error)
     }
   }
-  
+
   const fetchVillages = async (blockId) => {
     try {
       const { data } = await api.get('/areas', { params: { parentId: blockId, limit: 100 } })
@@ -771,7 +691,7 @@ function AddVoterModal({ onClose, onSuccess }) {
       console.error('Failed to fetch villages:', error)
     }
   }
-  
+
   const fetchBooths = async (villageId) => {
     try {
       const { data } = await api.get('/areas', { params: { type: 'BOOTH', parentId: villageId, limit: 200 } })
@@ -782,58 +702,32 @@ function AddVoterModal({ onClose, onSuccess }) {
       console.error('Failed to fetch booths:', error)
     }
   }
-  
+
   const handleStateChange = (stateId) => {
     setSelectedState(stateId)
     setSelectedDistrict('')
-    setSelectedTehsil('')
     setSelectedBlock('')
     setSelectedVillage('')
     setFormData({ ...formData, areaId: '' })
     setDistricts([])
-    setTehsils([])
     setBlocks([])
     setVillages([])
     setBooths([])
     if (stateId) fetchDistricts(stateId)
   }
-  
+
   const handleDistrictChange = async (districtId) => {
     setSelectedDistrict(districtId)
-    setSelectedTehsil('')
     setSelectedBlock('')
     setSelectedVillage('')
     setFormData({ ...formData, areaId: '' })
-    setTehsils([])
     setBlocks([])
     setVillages([])
     setBooths([])
     if (!districtId) return
-    const tehsilList = await fetchTehsils(districtId)
-    if (tehsilList.length === 0) {
-      await fetchBlocks(districtId)
-    }
+    await fetchBlocks(districtId)
   }
 
-  const handleTehsilChange = (value) => {
-    setSelectedBlock('')
-    setSelectedVillage('')
-    setFormData({ ...formData, areaId: '' })
-    setVillages([])
-    setBooths([])
-    if (value === '' || value === ADD_MODAL_DISTRICT_BLOCKS) {
-      setSelectedTehsil(value === ADD_MODAL_DISTRICT_BLOCKS ? ADD_MODAL_DISTRICT_BLOCKS : '')
-      setBlocks([])
-      if (selectedDistrict) {
-        fetchBlocks(selectedDistrict)
-      }
-      return
-    }
-    setSelectedTehsil(value)
-    setBlocks([])
-    fetchBlocks(value)
-  }
-  
   const handleBlockChange = (blockId) => {
     setSelectedBlock(blockId)
     setSelectedVillage('')
@@ -1013,8 +907,7 @@ function AddVoterModal({ onClose, onSuccess }) {
               </h3>
               <div className="rounded-lg bg-blue-50 p-3 mb-4">
                 <p className="text-sm text-blue-700">
-                  📍 State → District → (optional Tehsil) → Block → Village/Ward → Booth. अगर तहसील नहीं, ब्लॉक सीधे
-                  जिले से चुनें।
+                  📍 State → District → Block → Village/Ward → Booth.
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1046,25 +939,6 @@ function AddVoterModal({ onClose, onSuccess }) {
                     <option value="">Select District</option>
                     {districts.map(district => (
                       <option key={district._id} value={district._id}>{district.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tehsil (तहसील) — optional
-                  </label>
-                  <select
-                    value={selectedTehsil}
-                    onChange={(e) => handleTehsilChange(e.target.value)}
-                    className="input-field"
-                    disabled={!selectedDistrict}
-                  >
-                    <option value="">Select Tehsil</option>
-                    {tehsils.length > 0 && (
-                      <option value={ADD_MODAL_DISTRICT_BLOCKS}>No tehsil — blocks under district</option>
-                    )}
-                    {tehsils.map(tehsil => (
-                      <option key={tehsil._id} value={tehsil._id}>{tehsil.name}</option>
                     ))}
                   </select>
                 </div>

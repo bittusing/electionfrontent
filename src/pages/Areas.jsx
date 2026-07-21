@@ -6,12 +6,11 @@ import api from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import PaginationBar from '../components/PaginationBar'
 
-const AREA_TYPES = ['STATE', 'DISTRICT', 'TEHSIL', 'BLOCK', 'VILLAGE', 'WARD', 'BOOTH']
+const AREA_TYPES = ['STATE', 'DISTRICT', 'BLOCK', 'VILLAGE', 'WARD', 'BOOTH']
 
 const TYPE_BADGE_COLOR = {
   STATE: 'bg-blue-100 text-blue-700',
   DISTRICT: 'bg-indigo-100 text-indigo-700',
-  TEHSIL: 'bg-violet-100 text-violet-700',
   BLOCK: 'bg-cyan-100 text-cyan-700',
   VILLAGE: 'bg-green-100 text-green-700',
   WARD: 'bg-teal-100 text-teal-700',
@@ -87,13 +86,11 @@ export default function Areas() {
   // All areas (unpaginated, capped) — used to populate the parent dropdowns in Add/Edit modals
   const [allAreasForParentPicker, setAllAreasForParentPicker] = useState([])
 
-  // Cascading location filter (State -> District -> Tehsil -> Block), mirrors Voters page
+  // Cascading location filter (State -> District -> Block), mirrors Voters page
   const [filterStates, setFilterStates] = useState([])
   const [selectedFilterState, setSelectedFilterState] = useState('')
   const [filterDistricts, setFilterDistricts] = useState([])
   const [selectedFilterDistrict, setSelectedFilterDistrict] = useState('')
-  const [filterTehsils, setFilterTehsils] = useState([])
-  const [selectedFilterTehsil, setSelectedFilterTehsil] = useState('')
   const [filterBlocks, setFilterBlocks] = useState([])
   const [selectedFilterBlock, setSelectedFilterBlock] = useState('')
   const [ancestorId, setAncestorId] = useState('')
@@ -172,10 +169,8 @@ export default function Areas() {
   const handleFilterStateChange = async (stateId) => {
     setSelectedFilterState(stateId)
     setSelectedFilterDistrict('')
-    setSelectedFilterTehsil('')
     setSelectedFilterBlock('')
     setFilterDistricts([])
-    setFilterTehsils([])
     setFilterBlocks([])
     setAncestorId(stateId)
     setPagination((prev) => ({ ...prev, page: 1 }))
@@ -192,43 +187,14 @@ export default function Areas() {
 
   const handleFilterDistrictChange = async (districtId) => {
     setSelectedFilterDistrict(districtId)
-    setSelectedFilterTehsil('')
     setSelectedFilterBlock('')
-    setFilterTehsils([])
     setFilterBlocks([])
     setAncestorId(districtId || selectedFilterState)
     setPagination((prev) => ({ ...prev, page: 1 }))
 
     if (!districtId) return
     try {
-      const { data } = await api.get('/areas', { params: { type: 'TEHSIL', parentId: districtId, limit: 500 } })
-      const tehsils = data.success ? data.data || [] : []
-      setFilterTehsils(tehsils)
-      if (tehsils.length === 0) {
-        const { data: b } = await api.get('/areas', { params: { type: 'BLOCK', parentId: districtId, limit: 500 } })
-        if (b.success) setFilterBlocks(b.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch tehsils:', error)
-    }
-  }
-
-  const handleFilterTehsilChange = async (tehsilId) => {
-    setSelectedFilterTehsil(tehsilId)
-    setSelectedFilterBlock('')
-    setFilterBlocks([])
-    setAncestorId(tehsilId || selectedFilterDistrict || selectedFilterState)
-    setPagination((prev) => ({ ...prev, page: 1 }))
-
-    if (!tehsilId) {
-      if (selectedFilterDistrict) {
-        const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: selectedFilterDistrict, limit: 500 } })
-        if (data.success) setFilterBlocks(data.data || [])
-      }
-      return
-    }
-    try {
-      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: tehsilId, limit: 500 } })
+      const { data } = await api.get('/areas', { params: { type: 'BLOCK', parentId: districtId, limit: 500 } })
       if (data.success) setFilterBlocks(data.data || [])
     } catch (error) {
       console.error('Failed to fetch blocks:', error)
@@ -237,17 +203,15 @@ export default function Areas() {
 
   const handleFilterBlockChange = (blockId) => {
     setSelectedFilterBlock(blockId)
-    setAncestorId(blockId || selectedFilterTehsil || selectedFilterDistrict || selectedFilterState)
+    setAncestorId(blockId || selectedFilterDistrict || selectedFilterState)
     setPagination((prev) => ({ ...prev, page: 1 }))
   }
 
   const clearLocationFilter = () => {
     setSelectedFilterState('')
     setSelectedFilterDistrict('')
-    setSelectedFilterTehsil('')
     setSelectedFilterBlock('')
     setFilterDistricts([])
-    setFilterTehsils([])
     setFilterBlocks([])
     setAncestorId('')
     setPagination((prev) => ({ ...prev, page: 1 }))
@@ -276,7 +240,7 @@ export default function Areas() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Area Management</h1>
-          <p className="text-gray-600 mt-1">State → District → Tehsil → Block → Village/Ward → Booth</p>
+          <p className="text-gray-600 mt-1">State → District → Block → Village/Ward → Booth</p>
         </div>
         {permissions?.areas?.create && (
           <div className="flex gap-2">
@@ -350,7 +314,7 @@ export default function Areas() {
               Search
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <select value={selectedFilterState} onChange={(e) => handleFilterStateChange(e.target.value)} className="input-field">
               <option value="">All States</option>
               {filterStates.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
@@ -363,15 +327,6 @@ export default function Areas() {
             >
               <option value="">All Districts</option>
               {filterDistricts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
-            </select>
-            <select
-              value={selectedFilterTehsil}
-              onChange={(e) => handleFilterTehsilChange(e.target.value)}
-              className="input-field"
-              disabled={!selectedFilterDistrict}
-            >
-              <option value="">All Tehsils</option>
-              {filterTehsils.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
             </select>
             <select
               value={selectedFilterBlock}
@@ -561,7 +516,6 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
   const areaTypes = [
     { value: 'STATE', label: 'State (राज्य)' },
     { value: 'DISTRICT', label: 'District (जिला)' },
-    { value: 'TEHSIL', label: 'Tehsil (तहसील)' },
     { value: 'BLOCK', label: 'Block (ब्लॉक)' },
     { value: 'VILLAGE', label: 'Village (गाँव)' },
     { value: 'WARD', label: 'Ward (वार्ड)' },
@@ -573,9 +527,7 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
     const typeHierarchy = {
       STATE: [],
       DISTRICT: ['STATE'],
-      TEHSIL: ['DISTRICT'],
-      /** Block: under tehsil when used; otherwise directly under district (UP-style विकास खंड). */
-      BLOCK: ['TEHSIL', 'DISTRICT'],
+      BLOCK: ['DISTRICT'],
       VILLAGE: ['BLOCK'],
       WARD: ['BLOCK'],
       BOOTH: ['VILLAGE', 'WARD'],
@@ -588,8 +540,7 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
   const parentHintForEmpty = () => {
     const t = formData.type
     if (t === 'DISTRICT') return 'STATE'
-    if (t === 'TEHSIL') return 'DISTRICT'
-    if (t === 'BLOCK') return 'TEHSIL or DISTRICT (ब्लॉक सीधे जिले के नीचे भी)'
+    if (t === 'BLOCK') return 'DISTRICT'
     if (t === 'VILLAGE' || t === 'WARD') return 'BLOCK'
     if (t === 'BOOTH') return 'VILLAGE या WARD'
     return 'parent'
@@ -682,8 +633,7 @@ function AddAreaModal({ onClose, onSuccess, existingAreas }) {
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Hierarchy: STATE → DISTRICT → (optional TEHSIL) → BLOCK → VILLAGE/WARD → BOOTH. जहाँ तहसील नहीं,
-                ब्लॉक सीधे जिले के अंतर्गत बनाएँ।
+                Hierarchy: STATE → DISTRICT → BLOCK → VILLAGE/WARD → BOOTH.
               </p>
             </div>
 
@@ -846,7 +796,6 @@ function EditAreaModal({ area, onClose, onSuccess, existingAreas }) {
   const areaTypes = [
     { value: 'STATE', label: 'State (राज्य)' },
     { value: 'DISTRICT', label: 'District (जिला)' },
-    { value: 'TEHSIL', label: 'Tehsil (तहसील)' },
     { value: 'BLOCK', label: 'Block (ब्लॉक)' },
     { value: 'VILLAGE', label: 'Village (गाँव)' },
     { value: 'WARD', label: 'Ward (वार्ड)' },
@@ -858,8 +807,7 @@ function EditAreaModal({ area, onClose, onSuccess, existingAreas }) {
     const typeHierarchy = {
       STATE: [],
       DISTRICT: ['STATE'],
-      TEHSIL: ['DISTRICT'],
-      BLOCK: ['TEHSIL', 'DISTRICT'],
+      BLOCK: ['DISTRICT'],
       VILLAGE: ['BLOCK'],
       WARD: ['BLOCK'],
       BOOTH: ['VILLAGE', 'WARD'],
@@ -1123,7 +1071,8 @@ function BulkUploadAreaModal({ onClose, onSuccess }) {
 
     try {
       const { data } = await api.post('/areas/bulk-import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 180000,
       })
       if (data.success) {
         toast.success(data.message || 'Import complete')
@@ -1153,12 +1102,32 @@ function BulkUploadAreaModal({ onClose, onSuccess }) {
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-semibold text-blue-800 mb-2">Instructions:</h3>
               <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
-                <li>One row = one area, at <strong>any</strong> level (state, district, block, booth, etc.)</li>
-                <li>Columns: <code className="bg-white px-1 rounded">type</code>, <code className="bg-white px-1 rounded">name</code>, <code className="bg-white px-1 rounded">code</code>, <code className="bg-white px-1 rounded">population</code>, <code className="bg-white px-1 rounded">totalVoters</code>, <code className="bg-white px-1 rounded">latitude</code>, <code className="bg-white px-1 rounded">longitude</code></li>
-                <li>Path columns to auto-create the chain above each row: <code className="bg-white px-1 rounded">state</code>, <code className="bg-white px-1 rounded">district</code>, <code className="bg-white px-1 rounded">tehsil</code> (optional), <code className="bg-white px-1 rounded">block</code>, <code className="bg-white px-1 rounded">villageWard</code></li>
-                <li>Example: a BOOTH row with state/district/block/villageWard filled in will auto-create the state, district, block and village/ward too if they don&apos;t already exist — no need to add them as separate rows first</li>
+                <li>One row = one area, at <strong>any</strong> level (state, district, block, village, booth)</li>
+                <li>No <code className="bg-white px-1 rounded">type</code> column needed — a plain sheet of <code className="bg-white px-1 rounded">State Name</code>, <code className="bg-white px-1 rounded">District Name</code>, <code className="bg-white px-1 rounded">Block Code</code>/<code className="bg-white px-1 rounded">Block Name</code>, <code className="bg-white px-1 rounded">Village Code</code>/<code className="bg-white px-1 rounded">Village Name</code> columns works as-is — the deepest filled-in column decides the row's level</li>
+                <li>Optional columns: <code className="bg-white px-1 rounded">code</code>, <code className="bg-white px-1 rounded">population</code>, <code className="bg-white px-1 rounded">totalVoters</code>, <code className="bg-white px-1 rounded">latitude</code>, <code className="bg-white px-1 rounded">longitude</code> (apply to that row's own area)</li>
+                <li>A village row auto-creates its state, district and block too if they don&apos;t exist yet — no need to add them as separate rows first</li>
+                <li>Tens of thousands of rows are fine in one file — it's processed level-by-level in batches, not row-by-row</li>
                 <li>Re-uploading is safe — existing areas (matched by type + name + parent) are updated, not duplicated</li>
               </ul>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => window.open('/samples/area-template.csv', '_blank')}
+                className="btn-secondary text-sm flex items-center gap-2"
+              >
+                <FiDownload className="w-4 h-4" />
+                Multi-level sample
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open('/samples/area-villages-sample.csv', '_blank')}
+                className="btn-secondary text-sm flex items-center gap-2"
+              >
+                <FiDownload className="w-4 h-4" />
+                Villages-list sample (State/District/Block/Village)
+              </button>
             </div>
 
             {/* File Upload */}
